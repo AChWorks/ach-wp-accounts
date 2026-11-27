@@ -252,11 +252,49 @@ $sender=sendFlow($flow,$browser,$ticket);
 expectAccountError(fn()=> $flow->complete($browser,$ticket,$sender->code),'identity_conflict');
 ensureAccount(Identity::byUser($userId)->mobile===$newMobile,'Conflict changed identity');
 
+// Native email registration is independent of the plugin's registration switch.
+guest();
+update_option('ach_wp_accounts_allow_registration',false);
+update_option('ach_wp_accounts_checkout_required',true);
+$before=(int)$wpdb->get_var("SELECT COUNT(*) FROM $wpdb->users");
+$emailId=wc_create_new_customer('fixture_email_signup@example.invalid','fixture_email_signup');
+ensureAccount(is_int($emailId),'Native email registration changed by mobile policy');
+wc_set_customer_auth_cookie($emailId);
+ensureAccount(get_current_user_id()===$emailId && SessionProof::currentToken($emailId)!=='','Native email signup did not establish session');
+ensureAccount(Identity::byUser($emailId)===null && !SessionProof::qualifies() && \ACh\WPAccounts\CheckoutGate::blocked(),'Email registration bypassed mobile checkout gate');
+ensureAccount(\ACh\WPAccounts\BrowserApi::status('checkout')['can_link'],'Fresh native email registration needlessly required another password');
+clearLimits();
+$emailMobile='+989121111117';
+$ticket=$flow->start($browser,$emailMobile,'link','checkout');
+$sender=sendFlow($flow,$browser,$ticket);
+$result=$flow->complete($browser,$ticket,$sender->code);
+ensureAccount($result['outcome']==='linked' && get_current_user_id()===$emailId &&
+    (int)Identity::byMobile($emailMobile)->user_id===$emailId && SessionProof::qualifies() &&
+    !\ACh\WPAccounts\CheckoutGate::blocked(),'Email customer first linking did not qualify same account');
+ensureAccount((int)$wpdb->get_var("SELECT COUNT(*) FROM $wpdb->users")===$before+1 &&
+    get_userdata($emailId)->user_email==='fixture_email_signup@example.invalid','Email link duplicated or changed the native account');
+nativeSession($emailId);
+ensureAccount(\ACh\WPAccounts\CheckoutGate::blocked(),'Subsequent password session bypassed mobile proof');
+clearLimits();
+$ticket=$flow->start($browser,$emailMobile,'step_up','checkout');
+$sender=sendFlow($flow,$browser,$ticket);
+$flow->complete($browser,$ticket,$sender->code);
+ensureAccount(!\ACh\WPAccounts\CheckoutGate::blocked(),'Existing mobile step-up did not reopen checkout');
+update_option('ach_wp_accounts_checkout_required',false);
+update_option('ach_wp_accounts_allow_registration',true);
+
 $plainPassword=wp_generate_password(32);
 $legacyId=wp_insert_user(['user_login'=>'fixture_legacy_link','user_pass'=>$plainPassword,'user_email'=>'legacy@example.invalid','role'=>'customer']);
 ensureAccount(is_int($legacyId),'Legacy fixture creation failed');
 nativeSession($legacyId);
+$token=SessionProof::currentToken($legacyId);
+$manager=WP_Session_Tokens::get_instance($legacyId);
+$oldSession=$manager->get($token);
+$oldSession['login']=time()-SessionProof::LINK_FRESHNESS-1;
+$manager->update($token,$oldSession);
+ensureAccount(!\ACh\WPAccounts\BrowserApi::status('checkout')['can_link'],'Stale native session could link without credential');
 clearLimits();
+expectAccountError(fn()=> $flow->start($browser,'+989121111114','link','account'),'reauthentication_required');
 expectAccountError(fn()=> $flow->start($browser,'+989121111114','link','account','wrong'),'reauthentication_required');
 $ticket=$flow->start($browser,'+989121111114','link','account',$plainPassword);
 $sender=sendFlow($flow,$browser,$ticket);
@@ -264,13 +302,56 @@ $flow->complete($browser,$ticket,$sender->code);
 ensureAccount((int)Identity::byMobile('+989121111114')->user_id===$legacyId && SessionProof::qualifies(),'Fresh native credential link failed');
 ensureAccount(wp_is_password_reset_allowed_for_user($legacyId)===true,'Existing account recovery changed');
 
+// A phone-created account must never store an unconfirmed recovery address.
+wp_set_current_user($userId);
+$_COOKIE[LOGGED_IN_COOKIE]=$nativeCookie;
+ensureAccount(SessionProof::qualifies(SessionProof::LINK_FRESHNESS),'Managed account fixture lost recent proof');
 $changed=wp_update_user(['ID'=>$userId,'user_email'=>'unverified@example.invalid']);
-ensureAccount(!is_wp_error($changed) && wp_is_password_reset_allowed_for_user($userId)===false,'Unverified email gained recovery');
-$service=wc_get_container()->get('Automattic\WooCommerce\Internal\CustomerEmailVerification\EmailVerificationService');
-$service->mark_verified($userId,'unverified@example.invalid');
-ensureAccount(wp_is_password_reset_allowed_for_user($userId)===true,'Native verified email recovery not recognized');
-wp_update_user(['ID'=>$userId,'user_email'=>'changed@example.invalid']);
-ensureAccount(wp_is_password_reset_allowed_for_user($userId)===false,'Changed email retained recovery proof');
+ensureAccount(is_wp_error($changed) && get_userdata($userId)->user_email==='' &&
+    wp_is_password_reset_allowed_for_user($userId)===false,'Unconfirmed address was stored as native account email');
+$required=apply_filters('woocommerce_save_account_details_required_fields',['account_email'=>'Email','account_first_name'=>'Name']);
+ensureAccount(!isset($required['account_email']) && isset($required['account_first_name']),'Optional recovery email changed unrelated profile validation');
+$profileErrors=new WP_Error();
+$profileData=(object)['ID'=>$userId,'user_email'=>'unverified@example.invalid'];
+do_action_ref_array('woocommerce_save_account_details_errors',[&$profileErrors,&$profileData]);
+ensureAccount($profileErrors->has_errors(),'Native commerce profile accepted unconfirmed account email');
+update_user_meta($userId,'billing_email','billing@example.invalid');
+ensureAccount(get_userdata($userId)->user_email==='' && get_user_meta($userId,'billing_email',true)==='billing@example.invalid','Billing email became recovery email');
+
+clearLimits();
+$beforeMail=get_userdata($userId)->user_email;
+$request=\ACh\WPAccounts\EmailRecovery::request('confirmed@example.invalid');
+ensureAccount($request['outcome']==='confirmation_requested' && get_userdata($userId)->user_email===$beforeMail,'Recovery request changed native email before confirmation');
+$pending=get_user_meta($userId,'_new_email',true);
+ensureAccount(is_array($pending) && $pending['newemail']==='confirmed@example.invalid' && $pending['ach_expires']>time(),'Missing native email confirmation record');
+global $pagenow;
+$previousPage=$pagenow;
+$pagenow='profile.php';
+$_GET=['newuseremail'=>'wrong-fixture-link'];
+ensureAccount(\ACh\WPAccounts\EmailRecovery::allowNativeConfirmation(true)===true,'Invalid link opened native admin confirmation');
+$changed=wp_update_user(['ID'=>$userId,'user_email'=>'confirmed@example.invalid']);
+ensureAccount(is_wp_error($changed) && get_userdata($userId)->user_email==='','Invalid native link allowed account email write');
+$expired=$pending;
+$expired['ach_expires']=time()-1;
+update_user_meta($userId,'_new_email',$expired);
+$_GET=['newuseremail'=>$pending['hash']];
+ensureAccount(\ACh\WPAccounts\EmailRecovery::allowNativeConfirmation(true)===true,'Expired link opened native admin confirmation');
+update_user_meta($userId,'_new_email',$pending);
+ensureAccount(\ACh\WPAccounts\EmailRecovery::allowNativeConfirmation(true)===false,'Valid native confirmation was blocked');
+$changed=wp_update_user(['ID'=>$userId,'user_email'=>'confirmed@example.invalid']);
+ensureAccount(!is_wp_error($changed) && get_userdata($userId)->user_email==='confirmed@example.invalid' &&
+    wp_is_password_reset_allowed_for_user($userId)===true,'Native confirmation failed to establish recovery authority');
+delete_user_meta($userId,'_new_email'); // native profile.php consumes it after wp_update_user.
+$_GET=[];
+$pagenow=$previousPage;
+$changed=wp_update_user(['ID'=>$userId,'user_email'=>'changed@example.invalid']);
+ensureAccount(is_wp_error($changed) && get_userdata($userId)->user_email==='confirmed@example.invalid','Direct profile edit replaced confirmed recovery address');
+expectAccountError(fn()=> \ACh\WPAccounts\EmailRecovery::password('short','short'),'invalid_password');
+$fixturePassword=wp_generate_password(32);
+$changed=\ACh\WPAccounts\EmailRecovery::password($fixturePassword,$fixturePassword);
+ensureAccount($changed['outcome']==='password_saved' && $changed['session_qualified']===true &&
+    wp_check_password($fixturePassword,get_userdata($userId)->user_pass,$userId) && SessionProof::qualifies(),'Optional native password or current session refresh failed');
+unset($fixturePassword);
 
 guest();
 $raceMobile='+989121111115';

@@ -1,0 +1,48 @@
+/* Scoped styles: use the site's typography and ordinary button theme. */
+.ach-accounts {
+    box-sizing: border-box;
+    inline-size: min(100%, 28rem);
+    margin-block: 1rem;
+    padding: clamp(1rem, 3vw, 1.5rem);
+    border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+    border-radius: .75rem;
+    font-family: inherit;
+    text-align: start;
+}
+.ach-accounts [hidden],
+.ach-accounts-dialog[hidden] { display: none !important; }
+.ach-accounts h2 { margin-block: 0 .75rem; font-size: 1.2em; }
+.ach-accounts p { margin-block: .5rem; }
+.ach-accounts form { margin: .75rem 0 0; padding: 0; border: 0; box-shadow: none; background: transparent; }
+.ach-accounts label { display: block; margin-block: .5rem .25rem; }
+.ach-accounts input {
+    box-sizing: border-box;
+    inline-size: 100%;
+    min-block-size: 2.75rem;
+    margin-block-end: .75rem;
+    font: inherit;
+}
+.ach-accounts input[dir="ltr"] { text-align: center; font-variant-numeric: tabular-nums; }
+.ach-accounts [data-ach-code] { letter-spacing: .35em; }
+.ach-accounts .ach-accounts-primary { inline-size: 100%; min-block-size: 2.75rem; font: inherit; }
+.ach-accounts .ach-accounts-actions { display: flex; justify-content: space-between; gap: .5rem; flex-wrap: wrap; margin-block: .5rem; }
+.ach-accounts .ach-accounts-link,
+.ach-accounts-dialog .ach-accounts-link {
+    border: 0; padding: .3rem 0; background: transparent; color: inherit;
+    font: inherit; text-decoration: underline; text-underline-offset: .2em; cursor: pointer;
+}
+.ach-accounts button:disabled { cursor: not-allowed; opacity: .6; }
+.ach-accounts .ach-accounts-native { display: block; margin-block-start: .75rem; }
+.ach-accounts [data-ach-status]:empty { display: none; }
+.ach-accounts [data-ach-status][data-error="1"] { border-inline-start: .2rem solid currentColor; padding-inline-start: .5rem; }
+.ach-accounts :focus-visible,
+.ach-accounts-dialog :focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.ach-accounts-dialog { max-inline-size: calc(100vw - 2rem); max-block-size: calc(100vh - 2rem); border-radius: .75rem; padding: 1rem; }
+.ach-accounts-dialog::backdrop { background: rgba(0, 0, 0, .45); }
+.ach-accounts-dialog .ach-accounts { border: 0; padding: .5rem; margin: 0; }
+.login #login .ach-accounts { background: #fff; color: #1d2327; margin-block-end: 1rem; }
+.login #login .ach-accounts .ach-accounts-primary { background: #2271b1; color: #fff; }
+
+.ach-accounts-recovery { margin-block-start: 1rem; border-block-start: 1px solid color-mix(in srgb, currentColor 18%, transparent); padding-block-start: .75rem; }
+.ach-accounts-recovery summary { cursor: pointer; font-weight: 600; }
+.ach-accounts-recovery form + form { margin-block-start: 1.5rem; }

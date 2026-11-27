@@ -25,6 +25,21 @@ final class SessionProof
         return $token;
     }
 
+    /**
+     * Native login freshness is only sufficient for first linking an ordinary
+     * account. A later change of established mobile identity is stronger.
+     */
+    public static function recentNativeLogin(int $userId, int $maxAge): bool
+    {
+        $token = self::currentToken($userId);
+        if ($token === '') {
+            return false;
+        }
+        $session = \WP_Session_Tokens::get_instance($userId)->get($token);
+        $login = (int) ($session['login'] ?? 0);
+        return $login <= time() && $login > time() - $maxAge;
+    }
+
     public const LINK_FRESHNESS = 600;
 
     public static function qualifies(?int $maxAge = null): bool

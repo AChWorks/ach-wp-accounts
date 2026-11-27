@@ -104,14 +104,22 @@ final class BrowserApi
         }
     }
 
-    private static function status(): array
+    public static function status(string $context): array
     {
         $id = get_current_user_id();
+        if (!in_array($context, ['wp', 'account', 'checkout'], true)) {
+            throw new VerificationError('invalid_context');
+        }
         $identity = Identity::byUser($id);
         return [
             'authenticated' => $id > 0,
             'qualified' => SessionProof::qualifies(),
             'recent_proof' => SessionProof::qualifies(SessionProof::LINK_FRESHNESS),
+            'can_link' => $id > 0 && AccountPolicy::canLinkWithoutPassword($id, $identity),
+            'registration_allowed' => $id === 0 && AccountPolicy::registrationAllowed($context),
+            'managed_account' => EmailRecovery::managed($id),
+            'recovery_email' => EmailRecovery::managed($id) ? (string) get_userdata($id)->user_email : '',
+            'native_username' => EmailRecovery::managed($id) ? (string) get_userdata($id)->user_login : '',
             'has_mobile' => $identity !== null,
             'masked_mobile' => $identity ? '+98 ' . substr($identity->mobile, 3, 3) . ' *** ' . substr($identity->mobile, -4) : '',
         ];
@@ -129,6 +137,11 @@ final class BrowserApi
             'registration_disabled', 'registration_denied' => [403, __('Account registration is not available here. Please sign in to your existing account or contact support.', 'ach-wp-accounts')],
             'registration_pending' => [409, __('We could not finish creating your account. Please contact support before trying again.', 'ach-wp-accounts')],
             'reauthentication_required' => [403, __('Please confirm your current account credentials.', 'ach-wp-accounts')],
+            'invalid_email' => [400, __('Please enter a valid email address.', 'ach-wp-accounts')],
+            'email_unavailable' => [409, __('This email address is not available for this account.', 'ach-wp-accounts')],
+            'email_send_failed' => [503, __('The confirmation message could not be confirmed as sent. Please try again later.', 'ach-wp-accounts')],
+            'invalid_password' => [400, __('Use at least 15 characters and enter the same password twice.', 'ach-wp-accounts')],
+            'password_update_failed' => [503, __('The password could not be updated. Please try again later.', 'ach-wp-accounts')],
             'authentication_unavailable', 'storage_unavailable' => [503, __('Mobile verification is temporarily unavailable. Please try again later or contact support.', 'ach-wp-accounts')],
             default => [400, __('The request is invalid. Please start again.', 'ach-wp-accounts')],
         };
@@ -147,7 +160,7 @@ final class BrowserApi
             $flow = new AccountFlow();
             switch ($operation) {
                 case 'status':
-                    $result = self::status();
+                    $result = self::status(self::input('context', 32));
                     break;
                 case 'start':
                     self::sender(); // Validate configured provider identity before creating a flow.
@@ -159,7 +172,10 @@ final class BrowserApi
                         self::browser(true), $mobile, $purpose, self::input('context', 32),
                         self::input('password', 4096, false)
                     );
-                    $result = ['ticket' => $ticket];
+                    $canonical = Mobile::normalize($mobile);
+                    $result = ['ticket' => $ticket,
+                        'masked_mobile' => '+98 ' . substr($canonical, 3, 3) . ' *** ' . substr($canonical, -4),
+                    ];
                     break;
                 case 'issue':
                     $result = $flow->issue(
@@ -171,6 +187,12 @@ final class BrowserApi
                     $result = $flow->complete(
                         self::browser(false), self::input('ticket', 2048), self::input('code', 32)
                     );
+                    break;
+                case 'recovery_email':
+                    $result = EmailRecovery::request(self::input('email', 254));
+                    break;
+                case 'recovery_password':
+                    $result = EmailRecovery::password(self::input('new_password', 4096), self::input('confirmation', 4096));
                     break;
                 default:
                     throw new VerificationError('invalid_context');

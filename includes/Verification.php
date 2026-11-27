@@ -118,6 +118,8 @@ final class Verification
             'id' => $row->id,
             'state' => $row->send_state === 'pending' ? 'uncertain' : $row->send_state,
             'expires_at' => (int) $row->expires_at,
+            'expires_in' => max(0, (int) $row->expires_at - time()),
+            'retry_after' => max(0, (int) $row->created_at + $this->policy->cooldown - time()),
         ];
     }
 

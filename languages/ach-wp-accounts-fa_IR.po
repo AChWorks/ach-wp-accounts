@@ -1,0 +1,230 @@
+msgid ""
+msgstr "Project-Id-Version: ACh WP Accounts\nLanguage: fa_IR\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nPlural-Forms: nplurals=2; plural=(n > 1);\n"
+
+msgid "ACh WP Accounts"
+msgstr "ACh WP Accounts"
+
+msgid "ACh WP Accounts could not initialize its database or scheduled cleanup. Check site health and database permissions."
+msgstr "افزونه نتوانست پایگاه داده یا پاک‌سازی زمان‌بندی‌شده را آماده کند. وضعیت سلامت سایت و دسترسی‌های پایگاه داده را بررسی کنید."
+
+msgid "Account registration is not available here. Please sign in to your existing account or contact support."
+msgstr "ثبت‌نام در این بخش امکان‌پذیر نیست. وارد حساب فعلی خود شوید یا با پشتیبانی تماس بگیرید."
+
+msgid "Accounts status"
+msgstr "وضعیت حساب‌ها"
+
+msgid "Change mobile number"
+msgstr "تغییر شماره موبایل"
+
+msgid "Change your mobile number."
+msgstr "شماره موبایل جدید خود را وارد کنید."
+
+msgid "Check your email for the confirmation link. Your account email has not changed yet."
+msgstr "لینک تأیید را در ایمیل خود بررسی کنید. ایمیل حساب شما هنوز تغییر نکرده است."
+
+msgid "Close"
+msgstr "بستن"
+
+msgid "Confirm new password"
+msgstr "تکرار رمز عبور جدید"
+
+msgid "Confirm your recovery email for %s"
+msgstr "تأیید ایمیل بازیابی حساب در %s"
+
+msgid "Continue checkout"
+msgstr "ادامه خرید"
+
+msgid "Could not reach the verification service. Please try again."
+msgstr "ارتباط با سرویس تأیید برقرار نشد. دوباره تلاش کنید."
+
+msgid "Current password"
+msgstr "رمز عبور فعلی"
+
+msgid "Customer"
+msgstr "مشتری"
+
+msgid "Edit number"
+msgstr "ویرایش شماره"
+
+msgid "Enable JavaScript to verify your mobile number. Native sign-in remains available where permitted."
+msgstr "برای تأیید شماره موبایل، JavaScript مرورگر را فعال کنید. در صورت مجاز بودن، ورود با روش‌های دیگر همچنان امکان‌پذیر است."
+
+msgid "Enter the code sent to your mobile number."
+msgstr "کد ارسال‌شده به شماره موبایل خود را وارد کنید."
+
+msgid "Enter your mobile number."
+msgstr "شماره موبایل خود را وارد کنید."
+
+msgid "Get verification code"
+msgstr "دریافت کد تأیید"
+
+msgid "Inspect installed schema version and available provider capabilities. Does not send messages or access credentials."
+msgstr "بررسی نسخه ساختار داده و قابلیت‌های ارائه‌دهندگان پیامک، بدون ارسال پیام یا دسترسی به اطلاعات محرمانه."
+
+msgid "Manage your mobile number"
+msgstr "مدیریت شماره موبایل"
+
+msgid "Mobile number"
+msgstr "شماره موبایل"
+
+msgid "Mobile verification is temporarily unavailable."
+msgstr "تأیید موبایل موقتاً در دسترس نیست."
+
+msgid "Mobile verification is temporarily unavailable. Please try again later or contact support."
+msgstr "تأیید موبایل موقتاً در دسترس نیست. بعداً دوباره تلاش کنید یا با پشتیبانی تماس بگیرید."
+
+msgid "Multisite account identity is not supported by this development version."
+msgstr "این نسخه توسعه از هویت حساب در وردپرس چندسایته پشتیبانی نمی‌کند."
+
+msgid "New password"
+msgstr "رمز عبور جدید"
+
+msgid "Optional recovery options"
+msgstr "روش‌های اختیاری بازیابی حساب"
+
+msgid "Passwords do not match."
+msgstr "رمزهای عبور یکسان نیستند."
+
+msgid "Please check the mobile number and try again."
+msgstr "شماره موبایل را بررسی کنید و دوباره تلاش کنید."
+
+msgid "Please confirm your current account credentials."
+msgstr "لطفاً اطلاعات ورود به حساب فعلی خود را تأیید کنید."
+
+msgid "Please enter a valid email address."
+msgstr "یک آدرس ایمیل معتبر وارد کنید."
+
+msgid "Please sign in and verify your mobile number before continuing to payment."
+msgstr "برای ادامه خرید، وارد حساب خود شوید و شماره موبایل را تأیید کنید."
+
+msgid "Please sign in using your existing account credentials."
+msgstr "لطفاً با اطلاعات ورود به حساب فعلی خود وارد شوید."
+
+msgid "Recovery email"
+msgstr "ایمیل بازیابی"
+
+msgid "Retry request"
+msgstr "تلاش مجدد"
+
+msgid "Save password"
+msgstr "ذخیره رمز عبور"
+
+msgid "Send a new code"
+msgstr "ارسال مجدد کد"
+
+msgid "Send confirmation link"
+msgstr "ارسال لینک تأیید"
+
+msgid "Sign in"
+msgstr "ورود"
+
+msgid "Sign in or register"
+msgstr "ورود یا ثبت‌نام"
+
+msgid "Sign in or register with email"
+msgstr "ورود یا ثبت‌نام با ایمیل"
+
+msgid "Sign in with email or username"
+msgstr "ورود با ایمیل یا نام کاربری"
+
+msgid "The code could not be sent. Please try again."
+msgstr "ارسال کد انجام نشد. دوباره تلاش کنید."
+
+msgid "The code has expired. Request a new one."
+msgstr "مهلت کد به پایان رسیده است. کد جدیدی دریافت کنید."
+
+msgid "The code is invalid or has expired. Please check the code or request a new one."
+msgstr "کد نامعتبر است یا مهلت آن به پایان رسیده. کد را بررسی کنید یا کد جدیدی دریافت کنید."
+
+msgid "The confirmation message could not be confirmed as sent. Please try again later."
+msgstr "ارسال پیام تأیید قابل تأیید نبود. بعداً دوباره تلاش کنید."
+
+msgid "The message may have been sent. Enter the code if you receive it."
+msgstr "ممکن است پیامک ارسال شده باشد. اگر کد را دریافت کردید، آن را وارد کنید."
+
+msgid "The password could not be updated. Please try again later."
+msgstr "رمز عبور به‌روزرسانی نشد. بعداً دوباره تلاش کنید."
+
+msgid "The request is invalid. Please start again."
+msgstr "درخواست نامعتبر است. دوباره شروع کنید."
+
+msgid "This email address is not available for this account."
+msgstr "این آدرس ایمیل برای این حساب قابل استفاده نیست."
+
+msgid "This email confirmation link is invalid or expired. Return to your account and request a new link."
+msgstr "لینک تأیید ایمیل نامعتبر است یا منقضی شده. به حساب خود برگردید و لینک جدیدی دریافت کنید."
+
+msgid "This email is already confirmed."
+msgstr "این ایمیل قبلاً تأیید شده است."
+
+msgid "This mobile number cannot be linked to this account. Please use your existing account or contact support."
+msgstr "امکان اتصال این شماره به حساب وجود ندارد. از حساب فعلی خود استفاده کنید یا با پشتیبانی تماس بگیرید."
+
+msgid "To confirm this email address for your account, open the link below while signed in. The link expires in 24 hours.\n\n%s\n\nIf you did not request this change, ignore this message."
+msgstr "برای تأیید این ایمیل برای حساب خود، در حالی که وارد حساب شده‌اید، لینک زیر را باز کنید. این لینک تا ۲۴ ساعت معتبر است.\n\n%s\n\nاگر این درخواست را ثبت نکرده‌اید، این پیام را نادیده بگیرید."
+
+msgid "Too many requests. Please try again later."
+msgstr "تعداد درخواست‌ها بیش از حد مجاز است. بعداً دوباره تلاش کنید."
+
+msgid "Try again"
+msgstr "تلاش مجدد"
+
+msgid "Use at least 15 characters and enter the same password twice."
+msgstr "از حداقل ۱۵ نویسه استفاده کنید و رمز عبور را دو بار یکسان وارد کنید."
+
+msgid "Use at least 15 characters. No specific mix of characters is required."
+msgstr "حداقل ۱۵ نویسه وارد کنید. ترکیب خاصی از حروف، اعداد و نمادها اجباری نیست."
+
+msgid "Use recovery options to add or change your account email."
+msgstr "برای افزودن یا تغییر ایمیل حساب از بخش بازیابی حساب استفاده کنید."
+
+msgid "Use the optional recovery options to add or change your email."
+msgstr "برای افزودن یا تغییر ایمیل از روش‌های اختیاری بازیابی حساب استفاده کنید."
+
+msgid "Use your current password to change the number"
+msgstr "تغییر شماره با رمز عبور فعلی"
+
+msgid "Use your mobile number to access your account."
+msgstr "با شماره موبایل وارد حساب خود شوید."
+
+msgid "Username for native sign-in:"
+msgstr "نام کاربری برای ورود با رمز عبور:"
+
+msgid "Verification code"
+msgstr "کد تأیید"
+
+msgid "Verified mobile account operations."
+msgstr "عملیات حساب کاربری با موبایل تأییدشده."
+
+msgid "Verified. Continuing…"
+msgstr "تأیید شد. در حال ادامه…"
+
+msgid "Verify a mobile number for your current account."
+msgstr "یک شماره موبایل برای حساب فعلی خود تأیید کنید."
+
+msgid "Verify and continue"
+msgstr "تأیید و ادامه"
+
+msgid "Verify your mobile to continue checkout"
+msgstr "تأیید موبایل برای ادامه خرید"
+
+msgid "Verify your registered mobile number."
+msgstr "شماره موبایل ثبت‌شده خود را تأیید کنید."
+
+msgid "We could not finish creating your account. Please contact support before trying again."
+msgstr "ایجاد حساب شما کامل نشد. پیش از تلاش دوباره با پشتیبانی تماس بگیرید."
+
+msgid "You are signed in."
+msgstr "شما وارد حساب خود شده‌اید."
+
+msgid "Your account or mobile number changed. Please start again."
+msgstr "حساب یا شماره موبایل شما تغییر کرده است. دوباره شروع کنید."
+
+msgid "Your mobile number is verified."
+msgstr "شماره موبایل شما تأیید شده است."
+
+msgid "Your mobile sign-in remains available. Add an email or password only if you want another way to access your account."
+msgstr "ورود با موبایل همچنان امکان‌پذیر است. فقط اگر روش دیگری برای دسترسی به حساب می‌خواهید، ایمیل یا رمز عبور اضافه کنید."
+
+msgid "Your password was saved."
+msgstr "رمز عبور شما ذخیره شد."

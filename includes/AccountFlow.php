@@ -67,7 +67,7 @@ final class AccountFlow
             if ($userId < 1) {
                 throw new VerificationError('invalid_context');
             }
-            if (!SessionProof::qualifies(SessionProof::LINK_FRESHNESS)) {
+            if ($password !== '' || !AccountPolicy::canLinkWithoutPassword($userId, $own)) {
                 AccountPolicy::reauthenticate($userId, $password);
             }
         } else {

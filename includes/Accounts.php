@@ -66,16 +66,32 @@ final class AccountPolicy
         return $fresh;
     }
 
-    /** Bounded native reauthentication of the current authenticated account. */
-    public static function reauthenticate(int $userId, #[\SensitiveParameter] string $password): void
+    public static function canLinkWithoutPassword(int $userId, ?object $identity): bool
+    {
+        if (SessionProof::qualifies(SessionProof::LINK_FRESHNESS)) {
+            return true;
+        }
+        $user = get_userdata($userId);
+        return $identity === null && $user instanceof \WP_User && self::ordinary($user) &&
+            SessionProof::recentNativeLogin($userId, SessionProof::LINK_FRESHNESS);
+    }
+
+    public static function registrationAllowed(string $context): bool
+    {
+        try {
+            self::registrationRole($context);
+            return true;
+        } catch (VerificationError $error) {
+            return false;
+        }
+    }
+
+    /** Per-account budget for authenticated credential/security operations. */
+    public static function reserveAccountAction(string $action, int $userId, int $limit, string $errorCode = 'rate_limited'): void
     {
         global $wpdb;
-        $user = get_userdata($userId);
-        if (!$user || SessionProof::currentToken($userId) === '' || $password === '') {
-            throw new VerificationError('reauthentication_required');
-        }
         $hour = intdiv(time(), 3600) * 3600;
-        $key = hash_hmac('sha256', "ach-wpa-reauth\0$userId\0$hour", wp_salt('auth'));
+        $key = hash_hmac('sha256', "ach-wpa-account-action\0$action\0$userId\0$hour", wp_salt('auth'));
         $table = Schema::table('limits');
         $previous = $wpdb->suppress_errors(true);
         try {
@@ -83,94 +99,27 @@ final class AccountPolicy
                 "INSERT INTO $table (bucket_key,retire_at) VALUES (%s,%d) ON DUPLICATE KEY UPDATE bucket_key=bucket_key",
                 $key, $hour + 3600
             ));
-            $reserved = $wpdb->query($wpdb->prepare("UPDATE $table SET hits=hits+1 WHERE bucket_key=%s AND hits<10", $key));
+            $reserved = $wpdb->query($wpdb->prepare("UPDATE $table SET hits=hits+1 WHERE bucket_key=%s AND hits<%d", $key, $limit));
             if ($created === false || $reserved !== 1) {
-                throw new VerificationError('reauthentication_unavailable');
+                throw new VerificationError($errorCode);
             }
         } finally {
             $wpdb->suppress_errors($previous);
         }
+    }
+
+    /** Bounded native reauthentication of the current authenticated account. */
+    public static function reauthenticate(int $userId, #[\SensitiveParameter] string $password): void
+    {
+        $user = get_userdata($userId);
+        if (!$user || SessionProof::currentToken($userId) === '' || $password === '') {
+            throw new VerificationError('reauthentication_required');
+        }
+        self::reserveAccountAction('reauth', $userId, 10, 'reauthentication_unavailable');
         $verified = wp_authenticate($user->user_login, $password);
         if (!$verified instanceof \WP_User || $verified->ID !== $userId) {
             throw new VerificationError('reauthentication_required');
         }
-    }
-}
-
-/**
- * Phone-only accounts do not grant password reset authority to an email
- * merely because a profile/checkout extension wrote it. Adopt the supported
- * native confirmation events; existing accounts' recovery is untouched.
- */
-final class EmailRecovery
-{
-    private const MARKER = '_ach_accounts_registration';
-    private const VERIFIED = '_ach_accounts_verified_email';
-
-    private static function fingerprint(string $email): string
-    {
-        return hash_hmac('sha256', strtolower(trim($email)), wp_salt('auth'));
-    }
-
-    public static function allow(mixed $allow, int $userId): mixed
-    {
-        if ($allow !== true || !get_user_meta($userId, self::MARKER, true)) {
-            return $allow;
-        }
-        $user = get_userdata($userId);
-        $saved = get_user_meta($userId, self::VERIFIED, true);
-        if (!$user || !is_email($user->user_email)) {
-            return false;
-        }
-        if (is_string($saved) && hash_equals($saved, self::fingerprint($user->user_email))) {
-            return true;
-        }
-        // WC 11+ owns its native verification state, including address changes.
-        // This optional internal service is feature-detected, not a dependency.
-        $service = 'Automattic\\WooCommerce\\Internal\\CustomerEmailVerification\\EmailVerificationService';
-        if (function_exists('wc_get_container') && class_exists($service)) {
-            try {
-                $verification = wc_get_container()->get($service);
-                return is_callable([$verification, 'is_verified']) && $verification->is_verified($userId) === true;
-            } catch (\Throwable $error) {
-                return false;
-            }
-        }
-        return false;
-    }
-
-    private static function confirmed(int $userId): void
-    {
-        $user = get_userdata($userId);
-        if ($user && get_user_meta($userId, self::MARKER, true) && is_email($user->user_email)) {
-            update_user_meta($userId, self::VERIFIED, self::fingerprint($user->user_email));
-        }
-    }
-
-    public static function profileUpdated(int $userId, \WP_User $old): void
-    {
-        $user = get_userdata($userId);
-        if (!$user || !get_user_meta($userId, self::MARKER, true) || $old->user_email === $user->user_email) {
-            return;
-        }
-        delete_user_meta($userId, self::VERIFIED);
-        // Core profile.php consumes this exact native email-confirmation record
-        // after wp_update_user returns. A plain email update is not confirmation.
-        if (defined('IS_PROFILE_PAGE') && IS_PROFILE_PAGE && get_current_user_id() === $userId &&
-            is_string($_GET['newuseremail'] ?? null)) {
-            $pending = get_user_meta($userId, '_new_email', true);
-            if (is_array($pending) && is_string($pending['hash'] ?? null) &&
-                ($pending['newemail'] ?? null) === $user->user_email &&
-                hash_equals($pending['hash'], wp_unslash($_GET['newuseremail']))) {
-                self::confirmed($userId);
-            }
-        }
-    }
-
-    public static function hooks(): void
-    {
-        add_filter('allow_password_reset', [self::class, 'allow'], PHP_INT_MAX, 2);
-        add_action('profile_update', [self::class, 'profileUpdated'], 10, 2);
     }
 }
 
@@ -194,6 +143,10 @@ final class Accounts
         try {
             $errors = new \WP_Error();
             if ($commerce) {
+                $errors = apply_filters('woocommerce_process_registration_errors', $errors, $login, $data['user_pass'], '');
+                if (!$errors instanceof \WP_Error) {
+                    throw new VerificationError('registration_denied');
+                }
                 do_action('woocommerce_register_post', $login, '', $errors);
                 $errors = apply_filters('woocommerce_registration_errors', $errors, $login, '');
                 $data = apply_filters('woocommerce_new_customer_data', $data + [

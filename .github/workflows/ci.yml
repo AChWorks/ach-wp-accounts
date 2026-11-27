@@ -33,5 +33,6 @@ jobs:
         run: |
           git ls-files -z '*.php' | xargs -0 -n 1 php -l
           bash -n scripts/test-integration.sh
+          node --check assets/accounts.js
       - name: Run isolated WordPress and WooCommerce tests
         run: scripts/test-integration.sh

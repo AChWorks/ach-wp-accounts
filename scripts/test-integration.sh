@@ -49,7 +49,7 @@ for i in $(seq 1 100); do
 done
 mariadb --no-defaults --socket="$socket" -uroot -e "CREATE DATABASE accounts_fixture CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
 mkdir "$lab/wordpress/wp-content/plugins/ach-wp-accounts"
-cp -R "$repo/ach-wp-accounts.php" "$repo/includes" "$lab/wordpress/wp-content/plugins/ach-wp-accounts/"
+cp -R "$repo/ach-wp-accounts.php" "$repo/includes" "$repo/assets" "$repo/languages" "$lab/wordpress/wp-content/plugins/ach-wp-accounts/"
 export ACH_TEST_WP="$lab/wordpress" ACH_TEST_DIR="$lab" ACH_TEST_WP_VERSION="$wp_version"
 cat > "$lab/wordpress/wp-config.php" <<PHP
 <?php
@@ -84,3 +84,4 @@ PHP
 "$php_bin" "$repo/tests/woocommerce.php"
 "$php_bin" "$repo/tests/accounts.php"
 "$php_bin" "$repo/tests/checkout.php"
+"$php_bin" "$repo/tests/frontend.php"
