@@ -1,0 +1,75 @@
+/* Native wp-admin palette and typography; every rule is local to this page. */
+.ach-accounts-admin { max-inline-size: 1120px; }
+.ach-accounts-admin *,
+.ach-accounts-admin *::before,
+.ach-accounts-admin *::after { box-sizing: border-box; }
+.ach-accounts-admin [hidden] { display: none !important; }
+.ach-accounts-admin .ach-admin-readiness {
+    display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,12rem),1fr));
+    margin: 16px 0; gap: 1px; background: #dcdcde;
+    border: 1px solid #dcdcde; border-radius: 6px; overflow: hidden;
+}
+.ach-accounts-admin .ach-admin-readiness > div { background: #fff; padding: 13px 16px; min-inline-size: 0; }
+.ach-accounts-admin dt { color: #50575e; font-size: 12px; }
+.ach-accounts-admin dd { margin: 4px 0 0; font-weight: 600; overflow-wrap: anywhere; }
+.ach-accounts-admin .ach-admin-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-block-end: 16px; padding-inline-start: 0; }
+.ach-accounts-admin .ach-admin-tabs .nav-tab { float: none; margin: 0; white-space: normal; }
+.ach-accounts-admin .ach-admin-panel {
+    background: #fff; border: 1px solid #dcdcde; border-radius: 6px;
+    padding: clamp(16px,3vw,24px); margin-block: 16px; min-inline-size: 0;
+}
+.ach-accounts-admin .ach-admin-panel h2 { font-size: 16px; line-height: 1.5; margin: 0 0 12px; }
+.ach-accounts-admin h3 { margin-block: 24px 10px; font-size: 14px; }
+.ach-accounts-admin h4 { margin-block: 10px; }
+.ach-accounts-admin .ach-admin-setting { padding: 14px 0; border-block-end: 1px solid #f0f0f1; }
+.ach-accounts-admin .ach-admin-setting:last-of-type { margin-block-end: 16px; }
+.ach-accounts-admin .ach-admin-check {
+    display: flex; align-items: center; gap: 8px; font-weight: 600; line-height: 1.6;
+}
+.ach-accounts-admin .ach-admin-check input { margin: 0; flex-shrink: 0; }
+.ach-accounts-admin .ach-admin-field { margin: 12px 0; min-inline-size: 0; }
+.ach-accounts-admin .ach-admin-field > label { display: block; margin-block-end: 5px; font-weight: 600; }
+.ach-accounts-admin .ach-admin-field input,
+.ach-accounts-admin .ach-admin-field select,
+.ach-accounts-admin .ach-admin-field textarea {
+    display: block; inline-size: 100%; max-inline-size: 34rem; min-block-size: 34px; font: inherit;
+}
+.ach-accounts-admin .ach-admin-field textarea { min-block-size: 75px; }
+.ach-accounts-admin .ach-admin-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,18rem),1fr)); gap: 8px 20px; }
+.ach-accounts-admin .ach-admin-test-grid { gap: 20px; margin-block-start: 18px; }
+.ach-accounts-admin .ach-admin-test-grid > div { border: 1px solid #dcdcde; border-radius: 4px; padding: 16px; min-inline-size: 0; }
+.ach-accounts-admin .ach-admin-provider-nav,
+.ach-accounts-admin .ach-admin-pagination { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 12px; }
+.ach-accounts-admin .ach-admin-disclosure {
+    border-block-start: 1px solid #dcdcde; margin-block: 18px; padding-block-start: 14px;
+}
+.ach-accounts-admin summary { cursor: pointer; font-weight: 600; overflow-wrap: anywhere; }
+.ach-accounts-admin .ach-admin-override { border-block-start: 1px solid #f0f0f1; padding-block: 12px; }
+.ach-accounts-admin .ach-admin-metadata { margin: 8px 0; }
+.ach-accounts-admin .ach-admin-metadata > div {
+    display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.5fr); gap: 8px; margin-block: 8px;
+}
+.ach-accounts-admin .ach-admin-metadata dd { margin: 0; text-align: end; }
+.ach-accounts-admin .ach-admin-receipt { border-inline-start: 3px solid #72aee6; background: #f6f7f7; padding: 12px; margin-block-start: 12px; }
+.ach-accounts-admin .ach-admin-filter { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin-block: 12px; }
+.ach-accounts-admin .ach-admin-filter .ach-admin-field { margin: 0; flex: 1 1 9rem; }
+.ach-accounts-admin .ach-admin-table-scroll { max-inline-size: 100%; overflow-x: auto; margin-block: 18px; }
+.ach-accounts-admin .ach-admin-table-scroll table { min-inline-size: 620px; }
+.ach-accounts-admin .ach-admin-table-scroll th,
+.ach-accounts-admin .ach-admin-table-scroll td { vertical-align: top; text-align: start; }
+.ach-accounts-admin .ach-admin-table-scroll .ach-admin-receipt { min-inline-size: 210px; }
+.ach-accounts-admin .ach-admin-state { font-weight: 600; }
+.ach-accounts-admin .ach-admin-state-accepted { color: #008a20; }
+.ach-accounts-admin .ach-admin-state-failed { color: #b32d2e; }
+.ach-accounts-admin .ach-admin-state-uncertain { color: #8a4b00; }
+.ach-accounts-admin :focus-visible { outline: 2px solid #2271b1; outline-offset: 2px; }
+@media (max-width:782px) {
+    .ach-accounts-admin .ach-admin-tabs .nav-tab { font-size: 13px; }
+    .ach-accounts-admin .ach-admin-grid { grid-template-columns: minmax(0,1fr); }
+    .ach-accounts-admin .ach-admin-panel { padding: 16px; }
+    .ach-accounts-admin .ach-admin-field input,
+    .ach-accounts-admin .ach-admin-field select,
+    .ach-accounts-admin .ach-admin-field textarea { min-block-size: 40px; }
+    .ach-accounts-admin .ach-admin-metadata > div { grid-template-columns: minmax(0,1fr); gap: 2px; }
+    .ach-accounts-admin .ach-admin-metadata dd { text-align: start; }
+}

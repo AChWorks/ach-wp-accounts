@@ -59,9 +59,9 @@ final class Settings
         return (self::current()[$key] ?? false) === true;
     }
 
-    public static function policy(): VerificationPolicy
+    public static function policy(#[\SensitiveParameter] ?array $snapshot = null): VerificationPolicy
     {
-        return new VerificationPolicy(...self::validatePolicy(self::current()['verification']));
+        return new VerificationPolicy(...self::validatePolicy(($snapshot ?? self::current())['verification']));
     }
 
     public static function retentionSeconds(): int
@@ -76,9 +76,9 @@ final class Settings
         return array_column(ProviderRegistry::capabilities(), 'id');
     }
 
-    public static function sender(?string $id = null): HttpSmsSender
+    public static function sender(?string $id = null, #[\SensitiveParameter] ?array $snapshot = null): HttpSmsSender
     {
-        $settings = self::current();
+        $settings = $snapshot ?? self::current();
         $id ??= $settings['selected_provider'];
         if (!is_string($id) || !in_array($id, self::ids(), true)) {
             throw new SettingsError('selected_provider', 'provider_unconfigured');
@@ -110,7 +110,7 @@ final class Settings
         return self::publicProjection(self::current());
     }
 
-    private static function publicProjection(array $s): array
+    private static function publicProjection(#[\SensitiveParameter] array $s): array
     {
         $providers = [];
         foreach (self::ids() as $id) {
@@ -268,7 +268,7 @@ final class Settings
     }
 
     /**
-     * Only the future nonce-protected wp-admin adapter may opt into writes of
+     * Only the nonce-protected wp-admin adapter may opt into writes of
      * credentials. Abilities always call the non-secret variant.
      * Provider config is a complete saved route or omitted; no half-active config.
      */
@@ -338,14 +338,16 @@ final class Settings
             if ($next['checkout_required'] && !function_exists('WC') && empty($stored['checkout_required'])) {
                 throw new SettingsError('checkout_required', 'woocommerce_unavailable');
             }
-            if ($next['auth_enabled']) {
-                $id = $next['selected_provider'];
+            $id = $next['selected_provider'];
+            if ($next['auth_enabled'] || (array_key_exists('selected_provider',$patch) && $id !== '')) {
                 if (!isset($next['providers'][$id])) {
                     throw new SettingsError('selected_provider', 'provider_unconfigured');
                 }
                 // Revalidate the selected saved config even when the patch
                 // only changes an enable flag. No network side effects.
                 $next['providers'][$id] = self::config($id, $next['providers'][$id], [], false);
+            }
+            if ($next['auth_enabled']) {
                 // Check actual HTTPS origin compatibility, not connectivity.
                 if (!BrowserApi::compatibleOrigin() || is_multisite() ||
                     (int)get_option('ach_wp_accounts_schema_version', 0) !== Schema::VERSION) {

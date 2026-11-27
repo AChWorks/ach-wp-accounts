@@ -86,3 +86,50 @@ PHP
 "$php_bin" "$repo/tests/checkout.php"
 "$php_bin" "$repo/tests/frontend.php"
 "$php_bin" "$repo/tests/operations.php"
+"$php_bin" "$repo/tests/admin.php"
+# Simulate a reviewed stable release without tagging or publishing.
+release_source="$lab/release-source"
+mkdir "$release_source"
+cp -R "$repo/ach-wp-accounts.php" "$repo/includes" "$repo/assets" "$repo/languages" "$repo/LICENSE" "$release_source/"
+python3 - "$release_source/ach-wp-accounts.php" <<'PYVERSION'
+from pathlib import Path
+import re, sys
+p = Path(sys.argv[1])
+s = p.read_text()
+m = re.search(r"(?m)^(\s*\*\s*Version:\s*)(\d+)\.(\d+)\.(\d+)([^\r\n]*)$", s)
+if m is None:
+    raise SystemExit("Unexpected plugin version header")
+major, minor, patch = map(int, m.group(2, 3, 4))
+# Always exercise an actual upgrade, even after the first stable release.
+next_version = f"{major}.{minor}.{patch + 1}"
+p.write_text(s[:m.start()] + m.group(1) + next_version + s[m.end():])
+PYVERSION
+# Non-runtime files must never leak into the installable artifact.
+mkdir -p "$release_source/docs" "$release_source/tests" "$release_source/assets/dev"
+printf 'fixture only' > "$release_source/docs/internal.md"
+printf 'fixture only' > "$release_source/tests/example.php"
+printf 'fixture only' > "$release_source/assets/.env"
+printf 'fixture only' > "$release_source/assets/dev/tool.js"
+python3 "$repo/scripts/build-release.py" --source "$release_source" --output "$lab/release-fixture" --tested-wp "$wp_version"
+python3 "$repo/scripts/build-release.py" --source "$release_source" --output "$lab/release-repeat" --tested-wp "$wp_version"
+cmp "$lab/release-fixture/ach-wp-accounts.zip" "$lab/release-repeat/ach-wp-accounts.zip"
+cmp "$lab/release-fixture/ach-wp-accounts-release.json" "$lab/release-repeat/ach-wp-accounts-release.json"
+python3 - "$release_source" "$lab/release-fixture" <<'PYTEST'
+import hashlib, json, sys, zipfile
+from pathlib import Path
+source, output = map(Path, sys.argv[1:])
+archive = output / "ach-wp-accounts.zip"
+manifest = json.loads((output / "ach-wp-accounts-release.json").read_text())
+expected = {"ach-wp-accounts/ach-wp-accounts.php", "ach-wp-accounts/LICENSE"}
+for folder, glob in (("includes", "*.php"), ("assets", "*.css"), ("assets", "*.js"), ("languages", "*.mo")):
+    expected.update("ach-wp-accounts/" + p.relative_to(source).as_posix() for p in (source / folder).glob(glob))
+with zipfile.ZipFile(archive) as z:
+    assert set(z.namelist()) == expected, sorted(set(z.namelist()) ^ expected)
+    assert z.testzip() is None
+    assert all(z.read(n) == (source / n.removeprefix("ach-wp-accounts/")).read_bytes() for n in expected)
+assert manifest["sha256"] == hashlib.sha256(archive.read_bytes()).hexdigest()
+assert manifest["size"] == archive.stat().st_size
+assert manifest["requires_php"] == "8.1", "Approved minimum PHP version changed"
+print("PASS: deterministic runtime-only release ZIP, exact expected files and manifest")
+PYTEST
+"$php_bin" "$repo/tests/updater.php"

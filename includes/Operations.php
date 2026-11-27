@@ -3,13 +3,23 @@ namespace ACh\WPAccounts;
 
 defined('ABSPATH') || exit;
 
-/** Shared operator operations for the future native admin and Abilities. */
+/** Shared operator operations for native admin and Abilities. */
 final class Operations
 {
-    public static function connection(?string $provider = null): array
+    private static function snapshot(?string $revision): array
+    {
+        $settings = Settings::current();
+        if ($revision !== null && $settings['revision'] !== $revision) {
+            throw new SettingsError('revision','settings_conflict');
+        }
+        return $settings;
+    }
+
+    public static function connection(?string $provider = null, ?string $revision = null): array
     {
         Settings::requireOperator();
-        $sender = Settings::sender($provider);
+        $settings = self::snapshot($revision);
+        $sender = Settings::sender($provider,$settings);
         $start = hrtime(true);
         try {
             $result = $sender->connection();
@@ -24,7 +34,7 @@ final class Operations
      * same durable issuance budgets. Its generated code has no auth authority.
      * Exact request replay is safe within the challenge retention horizon.
      */
-    public static function testSend(string $mobile, string $purpose, string $requestId, bool $confirmed, ?string $provider = null): array
+    public static function testSend(string $mobile, string $purpose, string $requestId, bool $confirmed, ?string $provider = null, ?string $revision = null): array
     {
         Settings::requireOperator();
         if (!$confirmed) {
@@ -38,11 +48,12 @@ final class Operations
         } catch (\InvalidArgumentException $error) {
             throw new SettingsError('mobile');
         }
-        $sender = Settings::sender($provider);
+        $settings = self::snapshot($revision);
+        $sender = Settings::sender($provider,$settings);
         $actor = get_current_user_id();
         $id = substr(hash_hmac('sha256', "ach-accounts-test-id\0$actor\0$requestId", wp_salt('auth')), 0, 32);
         $flow = hash_hmac('sha256', "ach-accounts-test-flow\0$actor\0$requestId\0" . $sender->id(), wp_salt('auth'));
-        $service = new Verification(Settings::policy());
+        $service = new Verification(Settings::policy($settings));
         // CLI/admin jobs without a network request share the local budget.
         $network = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
         $service->issue($id, $mobile, 'test_' . $purpose, $flow, $network, $sender);

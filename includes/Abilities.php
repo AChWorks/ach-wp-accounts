@@ -199,17 +199,17 @@ final class Abilities
         $provider = self::enum(array_column(ProviderRegistry::capabilities(), 'id'));
         self::registerOne('provider-connection', __('Test provider connection', 'ach-wp-accounts'),
             __('Test saved provider credentials without sending SMS; records a diagnostic result.', 'ach-wp-accounts'),
-            self::object(['provider'=>$provider]), self::event(true),
-            static fn($input)=>Operations::connection($input['provider'] ?? null), false, false);
+            self::object(['provider'=>$provider,'revision'=>self::string()]), self::event(true),
+            static fn($input)=>Operations::connection($input['provider'] ?? null,$input['revision'] ?? null), false, false);
         self::registerOne('provider-test-send', __('Send a test SMS', 'ach-wp-accounts'),
             __('Explicitly send one potentially billable test message with the saved template. Requires confirmation and a unique request ID; exact replay is safe for the 24-hour challenge retention. The test cannot authenticate a customer.', 'ach-wp-accounts'),
             self::object([
-                'provider'=>$provider, 'mobile'=>self::string(), 'purpose'=>self::enum(['login','link','step_up']),
+                'provider'=>$provider, 'revision'=>self::string(), 'mobile'=>self::string(), 'purpose'=>self::enum(['login','link','step_up']),
                 'request_id'=>['type'=>'string','pattern'=>'^[0-9a-f]{32}$'],
                 'confirm_send'=>['type'=>'boolean'],
             ], ['mobile','purpose','request_id','confirm_send']),
             self::event(), static fn($input)=>Operations::testSend($input['mobile'], $input['purpose'],
-                $input['request_id'], $input['confirm_send'], $input['provider'] ?? null), false, false);
+                $input['request_id'], $input['confirm_send'], $input['provider'] ?? null,$input['revision'] ?? null), false, false);
         self::registerOne('diagnostics-query', __('Query account diagnostics', 'ach-wp-accounts'),
             __('Read paginated redacted message, connection and account-operation evidence; no OTPs, full mobile numbers or credentials.', 'ach-wp-accounts'),
             self::object([

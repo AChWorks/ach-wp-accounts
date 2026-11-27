@@ -203,7 +203,10 @@ if (function_exists('wp_get_ability')) {
         'revision'=>Settings::read()['revision'],'patch'=>['providers'=>['kavenegar'=>['credentials'=>['api_key'=>'not-allowed']]]],
     ]);
     opsCheck(is_wp_error($result),'Native ability accepted credentials');
-    $connection=wp_get_ability('ach-wp-accounts/provider-connection')->execute(['provider'=>'kavenegar']);
+    $stale=wp_get_ability('ach-wp-accounts/provider-connection')->execute(['provider'=>'kavenegar','revision'=>$read['revision']]);
+    opsCheck(is_wp_error($stale) && $stale->get_error_code()==='ach_accounts_settings_conflict' && $calls===0,
+        'Stale connection test contacted provider');
+    $connection=wp_get_ability('ach-wp-accounts/provider-connection')->execute(['provider'=>'kavenegar','revision'=>Settings::read()['revision']]);
 } else {
     $connection=Operations::connection('kavenegar');
 }
@@ -216,7 +219,10 @@ $_SERVER['REMOTE_ADDR']='192.0.2.1';
 $input=['provider'=>'kavenegar','mobile'=>'09121111111','purpose'=>'login','request_id'=>$id,'confirm_send'=>true];
 if (function_exists('wp_get_ability')) {
     $sendAbility=wp_get_ability('ach-wp-accounts/provider-test-send');
-    $receipt=$sendAbility->execute($input);
+    $stale=$sendAbility->execute($input+['revision'=>$read['revision']]);
+    opsCheck(is_wp_error($stale) && $stale->get_error_code()==='ach_accounts_settings_conflict' && $calls===1,
+        'Stale test send contacted provider');
+    $receipt=$sendAbility->execute($input+['revision'=>Settings::read()['revision']]);
     opsCheck(is_array($receipt),'Native test send output schema failed: '.(is_wp_error($receipt)?$receipt->get_error_code():'unexpected output'));
     $replayed=$sendAbility->execute($input);
 } else {

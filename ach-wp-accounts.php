@@ -3,6 +3,7 @@
  * Plugin Name: ACh WP Accounts
  * Description: Verified mobile identity and native WordPress account integration.
  * Version: 0.1.0-dev
+ * Update URI: https://github.com/AChWorks/ach-wp-accounts
  * Requires PHP: 8.1
  * Author: ACh
  * Author URI: https://ach.li/
@@ -30,10 +31,15 @@ require_once __DIR__ . '/includes/BrowserApi.php';
 require_once __DIR__ . '/includes/CheckoutGate.php';
 require_once __DIR__ . '/includes/Frontend.php';
 require_once __DIR__ . '/includes/Abilities.php';
+require_once __DIR__ . '/includes/Updater.php';
+require_once __DIR__ . '/includes/Admin.php';
+require_once __DIR__ . '/includes/AdminView.php';
 \ACh\WPAccounts\EmailRecovery::hooks();
 add_action('deleted_user', [\ACh\WPAccounts\Identity::class, 'deleteForUser']);
 add_action('clear_auth_cookie', [\ACh\WPAccounts\SessionProof::class, 'logout']);
 \ACh\WPAccounts\Abilities::hooks();
+\ACh\WPAccounts\Updater::hooks(__FILE__);
+\ACh\WPAccounts\Admin::hooks();
 \ACh\WPAccounts\BrowserApi::hooks();
 \ACh\WPAccounts\CheckoutGate::hooks();
 \ACh\WPAccounts\Frontend::hooks();
