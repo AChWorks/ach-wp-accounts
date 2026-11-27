@@ -43,12 +43,17 @@ final class Verification
     {
     }
 
-    private function digest(string $kind, string ...$parts): string
+    public function codeLifetime(): int
+    {
+        return $this->policy->codeLifetime;
+    }
+
+    private function digest(string $kind, #[\SensitiveParameter] string ...$parts): string
     {
         return hash_hmac('sha256', $kind . "\0" . implode("\0", $parts), wp_salt('auth'));
     }
 
-    private function validateContext(string $id, string $purpose, string $flow): void
+    private function validateContext(string $id, string $purpose, #[\SensitiveParameter] string $flow): void
     {
         if (!preg_match('/\A[0-9a-f]{32}\z/D', $id) || !preg_match('/\A[0-9a-f]{64}\z/D', $flow) ||
             !in_array($purpose, self::PURPOSES, true)) {
@@ -56,7 +61,7 @@ final class Verification
         }
     }
 
-    private function query(string $sql): int
+    private function query(#[\SensitiveParameter] string $sql): int
     {
         global $wpdb;
         $previous = $wpdb->suppress_errors(true);
@@ -71,7 +76,7 @@ final class Verification
         }
     }
 
-    private function row(string $sql): ?object
+    private function row(#[\SensitiveParameter] string $sql): ?object
     {
         global $wpdb;
         $previous = $wpdb->suppress_errors(true);
@@ -102,7 +107,7 @@ final class Verification
         return $this->row($wpdb->prepare("SELECT * FROM `$table` WHERE id = %s" . ($lock ? ' FOR UPDATE' : ''), $id));
     }
 
-    private function matches(object $row, string $purpose, string $flow): bool
+    private function matches(object $row, string $purpose, #[\SensitiveParameter] string $flow): bool
     {
         return $row->purpose === $purpose && hash_equals($row->flow_hash, $this->digest('flow', $flow));
     }
@@ -151,7 +156,7 @@ final class Verification
      * request subject to the same quotas. Network must be derived from trusted
      * server request context (not a caller-controlled forwarding header).
      */
-    public function issue(string $id, string $mobile, string $purpose, string $flow, string $network, SmsSender $sender): array
+    public function issue(string $id, string $mobile, string $purpose, #[\SensitiveParameter] string $flow, string $network, SmsSender $sender): array
     {
         global $wpdb;
         $this->validateContext($id, $purpose, $flow);
@@ -239,7 +244,7 @@ final class Verification
     }
 
     /** OTP is single-use; proof is a separate random single-use continuation. */
-    public function verify(string $id, string $purpose, string $flow, string $code): string
+    public function verify(string $id, string $purpose, #[\SensitiveParameter] string $flow, #[\SensitiveParameter] string $code): string
     {
         global $wpdb;
         $this->validateContext($id, $purpose, $flow);
@@ -277,7 +282,7 @@ final class Verification
     }
 
     /** Consume exactly once; account policy/authorization is a separate boundary. */
-    public function consume(string $id, string $purpose, string $flow, string $proof): string
+    public function consume(string $id, string $purpose, #[\SensitiveParameter] string $flow, #[\SensitiveParameter] string $proof): string
     {
         global $wpdb;
         $this->validateContext($id, $purpose, $flow);

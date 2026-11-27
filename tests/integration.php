@@ -135,8 +135,8 @@ if (($argv[1] ?? '') === 'worker') {
             'verify' => $service->verify($job['id'], $job['purpose'], $job['flow'], $job['code']),
             'consume' => $service->consume($job['id'], $job['purpose'], $job['flow'], $job['proof']),
             'identity' => $GLOBALS['wpdb']->query($GLOBALS['wpdb']->prepare(
-                'INSERT IGNORE INTO ' . Schema::table('identities') . ' (user_id,mobile,verified_at) VALUES (%d,%s,%d)',
-                $job['user'], $job['mobile'], time()
+                'INSERT IGNORE INTO ' . Schema::table('identities') . ' (user_id,mobile,revision,verified_at) VALUES (%d,%s,%s,%d)',
+                $job['user'], $job['mobile'], requestId(), time()
             )),
         };
         echo json_encode(['ok' => true, 'value' => $value], JSON_THROW_ON_ERROR);
@@ -271,7 +271,7 @@ $results = race($jobs);
 check(count(array_filter($results, static fn ($r) => $r['value'] === 1)) === 1, 'Mobile identity uniqueness failed');
 $identityTable = Schema::table('identities');
 $user = (int) $wpdb->get_var("SELECT user_id FROM $identityTable");
-check($wpdb->query($wpdb->prepare("INSERT IGNORE INTO $identityTable (user_id,mobile,verified_at) VALUES (%d,%s,%d)", $user, '+989123456780', time())) === 0, 'Per-user identity uniqueness failed');
+check($wpdb->query($wpdb->prepare("INSERT IGNORE INTO $identityTable (user_id,mobile,revision,verified_at) VALUES (%d,%s,%s,%d)", $user, '+989123456780', requestId(), time())) === 0, 'Per-user identity uniqueness failed');
 
 $wpdb->query($wpdb->prepare("UPDATE $challengeTable SET retire_at=%d WHERE id=%s", time()-1, $id));
 Schema::cleanup();

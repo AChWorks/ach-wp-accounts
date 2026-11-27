@@ -11,7 +11,7 @@ final class Schema
     public static function table(string $name): string
     {
         global $wpdb;
-        if (!in_array($name, ['identities', 'challenges', 'limits'], true)) {
+        if (!in_array($name, ['identities', 'challenges', 'limits', 'session_proofs'], true)) {
             throw new \InvalidArgumentException('Unknown accounts table.');
         }
         return $wpdb->prefix . 'ach_accounts_' . $name;
@@ -28,11 +28,13 @@ final class Schema
 
         // User IDs remain owned by WordPress. No billing field is an identity.
         dbDelta("CREATE TABLE $identities (
-            user_id bigint(20) unsigned NOT NULL,
             mobile varchar(16) NOT NULL,
+            user_id bigint(20) unsigned DEFAULT NULL,
+            revision char(32) NOT NULL,
             verified_at bigint(20) unsigned NOT NULL,
-            PRIMARY KEY  (user_id),
-            UNIQUE KEY mobile (mobile)
+            registration_login varchar(60) NOT NULL DEFAULT '',
+            PRIMARY KEY  (mobile),
+            UNIQUE KEY user_id (user_id)
         ) ENGINE=InnoDB $collation;");
         dbDelta("CREATE TABLE $challenges (
             id char(32) NOT NULL,
@@ -67,8 +69,20 @@ final class Schema
             KEY retire_at (retire_at)
         ) ENGINE=InnoDB $collation;");
 
+        $sessions = self::table('session_proofs');
+        dbDelta("CREATE TABLE $sessions (
+            token_hash char(64) NOT NULL,
+            user_id bigint(20) unsigned NOT NULL,
+            revision char(32) NOT NULL,
+            verified_at bigint(20) unsigned NOT NULL,
+            retire_at bigint(20) unsigned NOT NULL,
+            PRIMARY KEY  (token_hash),
+            KEY user_id (user_id),
+            KEY retire_at (retire_at)
+        ) ENGINE=InnoDB $collation;");
+
         // dbDelta returning a description is not proof of successful DDL.
-        foreach ([$identities => ['PRIMARY' => 'user_id', 'mobile' => 'mobile'], $challenges => ['PRIMARY' => 'id'], $limits => ['PRIMARY' => 'bucket_key']] as $table => $required) {
+        foreach ([$identities => ['PRIMARY' => 'mobile', 'user_id' => 'user_id'], $challenges => ['PRIMARY' => 'id'], $limits => ['PRIMARY' => 'bucket_key'], $sessions => ['PRIMARY' => 'token_hash']] as $table => $required) {
             $status = $wpdb->get_row($wpdb->prepare('SHOW TABLE STATUS WHERE Name = %s', $table));
             if (!$status || strcasecmp((string) $status->Engine, 'InnoDB') !== 0) {
                 throw new \RuntimeException('Required transactional accounts table unavailable.');
@@ -88,7 +102,7 @@ final class Schema
     {
         global $wpdb;
         $more = false;
-        foreach (['challenges', 'limits'] as $name) {
+        foreach (['challenges', 'limits', 'session_proofs'] as $name) {
             $table = self::table($name);
             $deleted = $wpdb->query($wpdb->prepare("DELETE FROM `$table` WHERE retire_at <= %d ORDER BY retire_at LIMIT 1000", time()));
             $more = $more || $deleted === 1000;

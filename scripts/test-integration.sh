@@ -2,6 +2,7 @@
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 php_bin="${PHP_BIN:-php}"
+export XDEBUG_MODE=off
 wp_version="${WP_VERSION:-7.1.5}"
 lab="$(mktemp -d "${TMPDIR:-/tmp}/ach-wpa.XXXXXX")"
 socket="$lab/db.sock"
@@ -62,6 +63,8 @@ define('AUTH_KEY', '$("$php_bin" -r 'echo bin2hex(random_bytes(32));')');
 define('AUTH_SALT', '$("$php_bin" -r 'echo bin2hex(random_bytes(32));')');
 define('WP_HOME', 'https://accounts.test');
 define('WP_SITEURL', 'https://accounts.test');
+ini_set('zend.exception_ignore_args', '1');
+define('WP_DISABLE_FATAL_ERROR_HANDLER', true);
 define('WP_DEBUG', true);
 define('WP_DEBUG_LOG', true);
 define('WP_DEBUG_DISPLAY', false);
@@ -79,3 +82,5 @@ PHP
 "$php_bin" "$repo/tests/providers.php"
 "$php_bin" "$repo/tests/abilities.php"
 "$php_bin" "$repo/tests/woocommerce.php"
+"$php_bin" "$repo/tests/accounts.php"
+"$php_bin" "$repo/tests/checkout.php"

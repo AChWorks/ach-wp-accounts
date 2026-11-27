@@ -18,8 +18,19 @@ require_once __DIR__ . '/includes/Mobile.php';
 require_once __DIR__ . '/includes/Messaging.php';
 require_once __DIR__ . '/includes/Providers.php';
 require_once __DIR__ . '/includes/Verification.php';
+require_once __DIR__ . '/includes/Identity.php';
+require_once __DIR__ . '/includes/SessionProof.php';
+require_once __DIR__ . '/includes/Accounts.php';
+require_once __DIR__ . '/includes/AccountFlow.php';
+require_once __DIR__ . '/includes/BrowserApi.php';
+require_once __DIR__ . '/includes/CheckoutGate.php';
 require_once __DIR__ . '/includes/Abilities.php';
+\ACh\WPAccounts\EmailRecovery::hooks();
+add_action('deleted_user', [\ACh\WPAccounts\Identity::class, 'deleteForUser']);
+add_action('clear_auth_cookie', [\ACh\WPAccounts\SessionProof::class, 'logout']);
 \ACh\WPAccounts\Abilities::hooks();
+\ACh\WPAccounts\BrowserApi::hooks();
+\ACh\WPAccounts\CheckoutGate::hooks();
 
 register_activation_hook(__FILE__, static function (bool $networkWide): void {
     if (is_multisite()) {

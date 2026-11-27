@@ -3,7 +3,7 @@ namespace ACh\WPAccounts;
 
 defined('ABSPATH') || exit;
 
-/** Native discovery only. The development foundation exposes no authentication or send action. */
+/** Native status discovery; never exposes account authentication or SMS actions. */
 final class Abilities
 {
     public static function hooks(): void
@@ -26,8 +26,9 @@ final class Abilities
             'schema_version' => (int) get_option('ach_wp_accounts_schema_version', 0),
             'expected_schema_version' => Schema::VERSION,
             'providers' => ProviderRegistry::capabilities(),
-            'authentication_available' => false,
-            'checkout_policy_available' => false,
+            'authentication_available' => BrowserApi::enabled(),
+            'checkout_policy_available' => function_exists('WC'),
+            'checkout_policy_enabled' => CheckoutGate::enabled(),
         ];
     }
 
@@ -51,6 +52,7 @@ final class Abilities
             ],
             'authentication_available' => ['type' => 'boolean'],
             'checkout_policy_available' => ['type' => 'boolean'],
+            'checkout_policy_enabled' => ['type' => 'boolean'],
         ];
         wp_register_ability('ach-wp-accounts/status', [
             'label' => __('Accounts status', 'ach-wp-accounts'),
