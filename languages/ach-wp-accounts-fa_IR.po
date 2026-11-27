@@ -91,8 +91,8 @@ msgstr "این تغییر فقط بر تاریخچه عیب‌یابی اثر د
 msgid "Check HTTPS origin, database schema and scheduled cleanup before enabling mobile sign-in."
 msgstr "پیش از فعال‌سازی ورود با موبایل، آدرس HTTPS، ساختار پایگاه داده و پاک‌سازی زمان‌بندی‌شده را بررسی کنید."
 
-msgid "Check an explicitly reviewed historical verification manifest, including source conflicts. Does not infer verification from phone metadata."
-msgstr "فهرست سوابق تأیید بررسی‌شده را همراه با تعارض‌های منبع بررسی کنید. تأیید شماره از روی فراداده شماره تلفن استنباط نمی‌شود."
+msgid "Check selected legacy account mappings and all source conflicts. Historical OTP proof is not required; no possession is asserted."
+msgstr "نگاشت‌های انتخاب‌شده حساب‌های قدیمی و تمام تعارض‌های منبع را بررسی کنید. سابقه کد تأیید لازم نیست و مالکیت شماره تأیید نمی‌شود."
 
 msgid "Check provider access without sending a message."
 msgstr "بررسی دسترسی به ارائه‌دهنده بدون ارسال پیامک."
@@ -247,8 +247,8 @@ msgstr "تاریخچه در دسترس نیست"
 msgid "I confirm sending one potentially billable test message."
 msgstr "ارسال یک پیامک آزمایشی را که ممکن است هزینه داشته باشد تأیید می‌کنم."
 
-msgid "Import only verified, uncontested existing-account mappings from the exact approved manifest. Confirm first; resume with next offset. Does not create, merge or overwrite accounts."
-msgstr "فقط ارتباط‌های تأییدشده و بدون تعارض حساب‌های موجود را از فهرست دقیق تأییدشده وارد کنید. ابتدا تأیید کنید و سپس از موقعیت بعدی ادامه دهید. حسابی ایجاد، ادغام یا بازنویسی نمی‌شود."
+msgid "Import selected, uncontested existing-account mappings from the exact approved manifest. Fresh OTP is required to verify possession. Confirm first; resume with next offset. Does not create, merge or overwrite accounts."
+msgstr "نگاشت‌های انتخاب‌شده و بدون تعارض حساب‌های موجود را از فهرست دقیق تأییدشده وارد کنید. تأیید مالکیت شماره به کد جدید نیاز دارد. ابتدا تأیید کنید و سپس از موقعیت بعدی ادامه دهید. حسابی ایجاد، ادغام یا بازنویسی نمی‌شود."
 
 msgid "Import reviewed Digits identities"
 msgstr "انتقال هویت‌های بررسی‌شده Digits"
@@ -658,8 +658,8 @@ msgstr "عملیات درخواستی کامل نشد. کد خطا و فیلد �
 msgid "The update package is not a recognized release."
 msgstr "بسته به‌روزرسانی یک نسخه انتشار معتبر نیست."
 
-msgid "The verified mobile identity was retained because removing it could prevent account recovery. Arrange another native recovery method or delete the account explicitly."
-msgstr "هویت موبایل تأییدشده حفظ شد، زیرا حذف آن ممکن است مانع بازیابی حساب شود. روش بازیابی بومی دیگری فراهم کنید یا حساب را به‌صورت صریح حذف کنید."
+msgid "The mobile identity was retained because removing it could prevent account recovery. Arrange another native recovery method or delete the account explicitly."
+msgstr "هویت موبایل حفظ شد، زیرا حذف آن ممکن است مانع بازیابی حساب شود. روش بازیابی بومی دیگری فراهم کنید یا حساب را به‌صورت صریح حذف کنید."
 
 msgid "This email address is not available for this account."
 msgstr "این آدرس ایمیل برای این حساب قابل استفاده نیست."
@@ -751,8 +751,8 @@ msgstr "الگوی تأیید"
 msgid "Verification policy"
 msgstr "تنظیمات تأیید"
 
-msgid "Verification source"
-msgstr "منبع تأیید"
+msgid "Identity source"
+msgstr "منبع هویت"
 
 msgid "Verification state:"
 msgstr "وضعیت تأیید:"

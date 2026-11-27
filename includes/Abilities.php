@@ -226,21 +226,21 @@ final class Abilities
         $migrationInput = [
             'evidence'=>self::string(),
             'rows'=>self::list(self::object(['user_id'=>self::integer(1),'mobile'=>self::string(),
-                'verified'=>['type'=>'boolean'],'verified_at'=>self::integer()],['user_id','mobile','verified'])),
+                'selected'=>['type'=>'boolean']],['user_id','mobile','selected'])),
             'offset'=>self::integer(),'limit'=>self::integer(1,100),
         ];
         $migrationOutput = self::object([
             'digest'=>self::string(),'total'=>self::integer(),'next_offset'=>['type'=>['integer','null']],
             'items'=>self::list(self::object(['index'=>self::integer(),'user_id'=>self::integer(1),'mobile_tail'=>self::string(),
-                'state'=>self::enum(['invalid_mobile','source_conflict','unverified','ineligible_account','already_bound','identity_conflict','ready','imported','write_unconfirmed'])],
+                'state'=>self::enum(['invalid_mobile','source_conflict','excluded','ineligible_account','already_bound','identity_conflict','ready','imported','write_unconfirmed'])],
                 ['index','user_id','mobile_tail','state'])),
         ],['digest','total','next_offset','items']);
         self::registerOne('migration-preview',__('Preview reviewed Digits identities','ach-wp-accounts'),
-            __('Check an explicitly reviewed historical verification manifest, including source conflicts. Does not infer verification from phone metadata.','ach-wp-accounts'),
+            __('Check selected legacy account mappings and all source conflicts. Historical OTP proof is not required; no possession is asserted.','ach-wp-accounts'),
             self::object($migrationInput,['evidence','rows']),$migrationOutput,
             static fn($input)=>Migration::run($input),true,true,[AccountPolicy::class,'accountOperator']);
         self::registerOne('migration-execute',__('Import reviewed Digits identities','ach-wp-accounts'),
-            __('Import only verified, uncontested existing-account mappings from the exact approved manifest. Confirm first; resume with next offset. Does not create, merge or overwrite accounts.','ach-wp-accounts'),
+            __('Import selected, uncontested existing-account mappings from the exact approved manifest. Fresh OTP is required to verify possession. Confirm first; resume with next offset. Does not create, merge or overwrite accounts.','ach-wp-accounts'),
             self::object($migrationInput+['digest'=>self::string(),'confirm'=>['type'=>'boolean']],['evidence','rows','digest','confirm']),$migrationOutput,
             static fn($input)=>Migration::run($input,true),false,true,[AccountPolicy::class,'accountOperator']);
         $provider = self::enum(array_column(ProviderRegistry::capabilities(), 'id'));

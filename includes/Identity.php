@@ -160,12 +160,36 @@ final class Identity
         return $identity;
     }
 
+    /**
+     * A reviewed legacy mapping can reserve the existing account without
+     * claiming possession. Record the first actual local OTP on that exact
+     * binding; preserve import provenance and never rotate its revision here.
+     * Internal caller must have consumed OTP proof for this binding.
+     */
+    public static function confirmPossession(object $identity): void
+    {
+        if ((int)$identity->verified_at > 0) { return; }
+        global $wpdb;
+        $table = Schema::table('identities');
+        $changed = self::write($wpdb->prepare(
+            "UPDATE $table SET verified_at=%d WHERE user_id=%d AND mobile=%s AND revision=%s AND verified_at=0",
+            time(), (int)$identity->user_id, $identity->mobile, $identity->revision
+        ));
+        if ($changed === 1) { return; }
+        $current = self::byUser((int)$identity->user_id);
+        // Another valid OTP may have confirmed the same binding concurrently.
+        if (!$current || $current->revision !== $identity->revision ||
+            $current->mobile !== $identity->mobile || (int)$current->verified_at <= 0) {
+            throw new VerificationError('identity_changed');
+        }
+    }
+
     /** Only the explicit reviewed migration service may call this. */
-    public static function importVerified(int $userId,string $mobile,int $verifiedAt,string $digest): void
+    public static function importReviewedMapping(int $userId,string $mobile,string $digest): void
     {
         global $wpdb;
         $mobile = Mobile::normalize($mobile);
-        if (!Lifecycle::ready() || $userId<1 || $verifiedAt<0 || $verifiedAt>time() ||
+        if (!Lifecycle::ready() || $userId<1 ||
             !preg_match('/\\A[0-9a-f]{64}\\z/D',$digest)) {
             throw new VerificationError('invalid_context');
         }
@@ -177,8 +201,8 @@ final class Identity
         $revision = bin2hex(random_bytes(16));
         if (self::write($wpdb->prepare(
             "INSERT INTO $table (mobile,user_id,revision,verified_at,source,source_ref)
-             SELECT %s,ID,%s,%d,'digits',%s FROM $wpdb->users WHERE ID=%d",
-            $mobile,$revision,$verifiedAt,$digest,$userId
+             SELECT %s,ID,%s,0,'digits',%s FROM $wpdb->users WHERE ID=%d",
+            $mobile,$revision,$digest,$userId
         ))!==1) {
             throw new VerificationError('identity_conflict');
         }

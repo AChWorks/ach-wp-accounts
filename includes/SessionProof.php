@@ -53,7 +53,7 @@ final class SessionProof
         try {
             global $wpdb;
             $identity = Identity::byUser($userId);
-            if (!$identity) {
+            if (!$identity || (int)$identity->verified_at <= 0) {
                 return false;
             }
             $table = Schema::table('session_proofs');
@@ -74,7 +74,7 @@ final class SessionProof
         }
     }
 
-    /** Internal only: caller has just consumed purpose-bound OTP proof. */
+    /** Internal only: fresh OTP or renewal of an already qualified native session. */
     public static function record(int $userId, #[\SensitiveParameter] string $token, object $identity): void
     {
         if (!Lifecycle::ready()) { throw new VerificationError('storage_unavailable'); }
@@ -85,6 +85,7 @@ final class SessionProof
             (int) $identity->user_id !== $userId || !hash_equals($identity->revision, $current->revision)) {
             throw new VerificationError('invalid_context');
         }
+        Identity::confirmPossession($current);
         $table = Schema::table('session_proofs');
         $previous = $wpdb->suppress_errors(true);
         try {

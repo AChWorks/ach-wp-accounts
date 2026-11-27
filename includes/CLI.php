@@ -42,7 +42,7 @@ final class CLI
                     $manifest['confirm'] = ($assoc['confirm'] ?? '')==='import-reviewed-identities';
                     return Migration::run($manifest,$apply);
                 });
-            },['shortdesc'=>$apply ? 'Import the exact reviewed manifest page.' : 'Preview a private reviewed manifest page.',
+            },['shortdesc'=>$apply ? 'Import the exact reviewed mapping page; fresh OTP verifies possession.' : 'Preview a private legacy mapping page.',
                 'synopsis'=>'<manifest> [--offset=<offset>] [--limit=<limit>]'.($apply ? ' --digest=<digest> --confirm=<confirmation>' : '')]);
         }
         \WP_CLI::add_command('ach-accounts purge',static function ($args,$assoc) use ($file): void {

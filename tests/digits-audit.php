@@ -56,10 +56,10 @@ try {
     clearstatcache(true,$path);
     auditCheck((fileperms($path)&0777)===0600,'Draft is not owner-only');
     $draft=json_decode(file_get_contents($path),true,512,JSON_THROW_ON_ERROR);
-    auditCheck(count($draft['rows'])===5 && !in_array(true,array_column($draft['rows'],'verified'),true),'Draft asserted historical proof');
+    auditCheck(count($draft['rows'])===5 && array_column($draft['rows'],'selected')===array_fill(0,5,true) && !array_key_exists('verified',$draft['rows'][0]),'Draft misrepresented selection or asserted proof');
     $preview=Migration::run($draft);
     $states=array_count_values(array_column($preview['items'],'state'));
-    auditCheck(($states['source_conflict']??0)===2 && ($states['unverified']??0)===3 && count($states)===2,'Unverified draft became import-ready');
+    auditCheck(($states['source_conflict']??0)===2 && ($states['ready']??0)===1 && ($states['ineligible_account']??0)===2 && count($states)===3,'Draft mapping classification incorrect');
     $original=file_get_contents($path);
     try { DigitsAudit::inspect($path); throw new LogicException('Existing draft overwritten'); }
     catch (RuntimeException $e) { auditCheck($e->getMessage()==='new_private_file_required','Unexpected overwrite rejection'); }
@@ -84,16 +84,16 @@ try {
 } finally { if (is_file($path)) { unlink($path); } }
 
 // Rehearse the observed site scale without copying any live customer data.
-// Include a distant unverified conflicting row and exactly one eligible
-// attested row, then resume/replay every page of the exact manifest.
+// Include a distant excluded conflicting row and exactly one eligible
+// selected row, then resume/replay every page of the exact manifest.
 $rows=[];
 for ($i=0;$i<3791;$i++) {
-    $rows[]=['user_id'=>1000000+$i,'mobile'=>'+9891205'.str_pad((string)$i,5,'0',STR_PAD_LEFT),'verified'=>false];
+    $rows[]=['user_id'=>1000000+$i,'mobile'=>'+9891205'.str_pad((string)$i,5,'0',STR_PAD_LEFT),'selected'=>false];
 }
-$rows[0]['user_id']=$a; $rows[0]['verified']=true;
-$rows[1]['user_id']=$b; $rows[1]['verified']=true;
+$rows[0]['user_id']=$a; $rows[0]['selected']=true;
+$rows[1]['user_id']=$b; $rows[1]['selected']=true;
 $rows[3790]['mobile']=$rows[0]['mobile'];
-$manifest=['evidence'=>'Synthetic scale rehearsal; not actual historical proof','rows'=>$rows];
+$manifest=['evidence'=>'Synthetic scale rehearsal; not actual source evidence','rows'=>$rows];
 $offset=0; $digest=null; $states=[]; $pages=0;
 do {
     $page=Migration::run($manifest+['offset'=>$offset,'limit'=>100]);
@@ -103,7 +103,7 @@ do {
     $offset=$page['next_offset']; $pages++;
 } while ($offset!==null);
 auditCheck($pages===38 && ($states['ready']??0)===1 && ($states['source_conflict']??0)===2 &&
-    ($states['unverified']??0)===3788 && array_sum($states)===3791,'Full scale preview misclassified candidates');
+    ($states['excluded']??0)===3788 && array_sum($states)===3791,'Full scale preview misclassified candidates');
 $offset=0; $states=[];
 do {
     $page=Migration::run($manifest+['offset'=>$offset,'limit'=>100,'digest'=>$digest,'confirm'=>true],true);
@@ -111,11 +111,11 @@ do {
     $offset=$page['next_offset'];
 } while ($offset!==null);
 $identity=Identity::byUser($b);
-auditCheck(($states['imported']??0)===1 && ($states['source_conflict']??0)===2 && ($states['unverified']??0)===3788 &&
-    $identity && $identity->source==='digits' && $identity->source_ref===$digest &&
+auditCheck(($states['imported']??0)===1 && ($states['source_conflict']??0)===2 && ($states['excluded']??0)===3788 &&
+    $identity && $identity->source==='digits' && $identity->source_ref===$digest && (int)$identity->verified_at===0 &&
     Identity::byUser($a)===null && (int)$wpdb->get_var("SELECT COUNT(*) FROM $wpdb->users")===$nativeBefore &&
     (int)$wpdb->get_var("SELECT COUNT(*) FROM $table")===$identitiesBefore+1,'Scale import did not preserve native accounts or conflicts');
 $again=Migration::run($manifest+['offset'=>0,'limit'=>100,'digest'=>$digest,'confirm'=>true],true);
 auditCheck($again['items'][0]['state']==='source_conflict' && $again['items'][1]['state']==='already_bound' &&
     Identity::byUser($b)->revision===$identity->revision,'Scale replay rewrote a binding');
-echo "PASS: read-only Digits audit, private unverified draft, split/conflict/role classification, 3,791-row reviewed manifest preview/apply/resume/replay\n";
+echo "PASS: read-only Digits audit, private candidate draft, split/conflict/role classification, 3,791-row reviewed manifest preview/apply/resume/replay\n";

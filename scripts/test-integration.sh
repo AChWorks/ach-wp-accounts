@@ -182,5 +182,22 @@ assert manifest["size"] == archive.stat().st_size
 assert manifest["requires_php"] == "8.1", "Approved minimum PHP version changed"
 print("PASS: deterministic runtime-only release ZIP, exact expected files and manifest")
 PYTEST
+# The CI staging package uses the exact checkout, including its unreleased
+# header, and the same runtime-only layout. No release manifest is permitted.
+python3 "$repo/scripts/build-release.py" --candidate --output "$lab/staging-package"
+python3 - "$repo" "$lab/staging-package" <<'PY_CANDIDATE'
+from pathlib import Path
+import sys, zipfile
+source, output = map(Path, sys.argv[1:])
+assert {p.name for p in output.iterdir()} == {"ach-wp-accounts.zip"}
+with zipfile.ZipFile(output / "ach-wp-accounts.zip") as z:
+    expected = {"ach-wp-accounts/ach-wp-accounts.php", "ach-wp-accounts/LICENSE"}
+    for folder, glob in (("includes", "*.php"), ("assets", "*.css"), ("assets", "*.js"), ("languages", "*.mo")):
+        expected.update("ach-wp-accounts/" + p.relative_to(source).as_posix() for p in (source / folder).glob(glob))
+    assert set(z.namelist()) == expected
+    assert z.testzip() is None
+    assert all(z.read(n) == (source / n.removeprefix("ach-wp-accounts/")).read_bytes() for n in expected)
+print("PASS: exact runtime-only staging ZIP without release manifest")
+PY_CANDIDATE
 "$php_bin" "$repo/tests/updater.php"
 "$php_bin" "$repo/tests/purge.php"

@@ -102,7 +102,7 @@ final class DigitsAudit
                 if ($cc[0] !== '+98' || $local[0] !== substr($split, 3)) {
                     $report['nonstandard_matching_split']++;
                 }
-                $candidates[] = ['user_id'=>$id, 'mobile'=>$split, 'verified'=>false];
+                $candidates[] = ['user_id'=>$id, 'mobile'=>$split, 'selected'=>true];
             } else {
                 // Do not invent pairings or omit conflicting candidates in an
                 // automatically produced manifest. The operator resolves these
@@ -121,12 +121,12 @@ final class DigitsAudit
         }
         $report['shared_numbers_among_resolved_candidates'] = count(array_filter($phones, static fn($owners) => count($owners) > 1));
         // This draft can include cross-user duplicates, privileged/missing
-        // accounts and skipped markers; nothing here is marked verified.
+        // accounts and skipped markers; no row asserts possession or approval.
         $report['draft_rows'] = count($candidates);
         $report['draft_available'] = (bool)$candidates && !$unexpectedKeys && !$report['incomplete_or_conflicting_source_users'];
         if ($draftPath !== null && $report['draft_available']) {
             self::writePrivateDraft($draftPath, [
-                'evidence'=>'Unverified Digits candidate inventory; NOT historical proof or an approved import.',
+                'evidence'=>'Digits candidate mapping inventory; NOT possession proof or an approved import.',
                 'rows'=>$candidates,
             ]);
             $report['draft_written'] = true;

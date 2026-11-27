@@ -4,8 +4,8 @@ namespace ACh\WPAccounts;
 defined('ABSPATH') || exit;
 
 /**
- * Import only an explicitly reviewed historical verification manifest.
- * No inference from Digits/billing meta, no account creation or merging.
+ * Import only explicitly reviewed legacy account mappings.
+ * A mapping is not possession proof; no account creation or merging.
  * The full manifest is checked for duplicate phones/users before each page.
  */
 final class Migration
@@ -27,16 +27,15 @@ final class Migration
         $entries = [];
         $phones = $users = [];
         foreach ($rows as $row) {
-            if (!is_array($row) || array_diff(array_keys($row),['user_id','mobile','verified','verified_at']) ||
+            if (!is_array($row) || array_diff(array_keys($row),['user_id','mobile','selected']) ||
                 !is_int($row['user_id'] ?? null) || $row['user_id']<1 ||
-                !is_string($row['mobile'] ?? null) || !is_bool($row['verified'] ?? null) ||
-                !is_int($row['verified_at'] ?? 0) || ($row['verified_at'] ?? 0)<0 || ($row['verified_at'] ?? 0)>time()) {
+                !is_string($row['mobile'] ?? null) || !is_bool($row['selected'] ?? null)) {
                 throw new SettingsError('rows');
             }
             $mobile = '';
             try { $mobile = Mobile::normalize($row['mobile']); } catch (\InvalidArgumentException $ignored) {}
-            $entry = ['user_id'=>$row['user_id'],'mobile'=>$mobile,'verified'=>$row['verified'],'verified_at'=>$row['verified_at'] ?? 0];
-            // Even an unverified candidate is a possible source collision.
+            $entry = ['user_id'=>$row['user_id'],'mobile'=>$mobile,'selected'=>$row['selected']];
+            // Even an excluded candidate is a possible source collision.
             $users[$entry['user_id']] = ($users[$entry['user_id']] ?? 0)+1;
             if ($mobile!=='') {
                 $phones[$mobile] = ($phones[$mobile] ?? 0)+1;
@@ -54,7 +53,7 @@ final class Migration
         $id = $row['user_id'];
         if ($mobile==='') { return 'invalid_mobile'; }
         if ($phones[$mobile]>1 || $users[$id]>1) { return 'source_conflict'; }
-        if (!$row['verified']) { return 'unverified'; }
+        if (!$row['selected']) { return 'excluded'; }
         $user = get_userdata($id);
         if (!$user || !current_user_can('edit_user',$id) || !AccountPolicy::ordinary($user)) { return 'ineligible_account'; }
         $byMobile = Identity::byMobile($mobile);
@@ -84,7 +83,7 @@ final class Migration
             $state = self::classify($row,$phones,$users);
             if ($apply && $state==='ready') {
                 try {
-                    Identity::importVerified($row['user_id'],$row['mobile'],$row['verified_at'],$digest);
+                    Identity::importReviewedMapping($row['user_id'],$row['mobile'],$digest);
                     $state = 'imported';
                 } catch (VerificationError $error) {
                     // A concurrent native link/registration may have won.

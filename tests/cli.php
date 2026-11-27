@@ -20,7 +20,7 @@ $native=get_user_by('login','fixture_migration_b');
 cliCheck($native instanceof WP_User,'CLI fixture user missing');
 $file=$dir.'/private-migration-cli.json';
 file_put_contents($file,wp_json_encode(['evidence'=>'Synthetic CLI reviewed fixture','rows'=>[
-    ['user_id'=>$native->ID,'mobile'=>'09124441111','verified'=>true]
+    ['user_id'=>$native->ID,'mobile'=>'09124441111','selected'=>true]
 ]]),LOCK_EX);
 chmod($file,0600);
 try {
@@ -41,7 +41,7 @@ try {
         $report=cliRun(['eval-file',$script,$draftPath]);
         cliCheck($report['draft_written'] && $report['draft_rows']===5 && $report['historical_verification_assertions']===0,'WP-CLI Digits audit failed');
         $draft=json_decode(file_get_contents($draftPath),true,512,JSON_THROW_ON_ERROR);
-        cliCheck(count($draft['rows'])===5 && !in_array(true,array_column($draft['rows'],'verified'),true),'WP-CLI draft asserted proof');
+        cliCheck(count($draft['rows'])===5 && array_column($draft['rows'],'selected')===array_fill(0,5,true) && !array_key_exists('verified',$draft['rows'][0]),'WP-CLI draft misrepresented selection or proof');
         cliRun(['eval-file',$script,$draftPath],'fixture_admin',false);
     } finally { if (is_file($draftPath)) { unlink($draftPath); } }
 

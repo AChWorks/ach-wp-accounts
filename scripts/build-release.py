@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Build a deterministic, installable release ZIP and update manifest.
+"""Build the deterministic runtime ZIP for a release or a staging candidate.
 
-This script never tags or publishes. Run on the reviewed release checkout.
+This script never tags or publishes. Candidate mode cannot emit a release manifest.
 """
 import argparse
 import hashlib
@@ -24,12 +24,15 @@ def header(text, name, required=True):
     return ""
 
 
-def build(source, output, tested_wp):
+def build(source, output, tested_wp, candidate=False):
     entry = source / (SLUG + ".php")
     text = entry.read_text(encoding="utf-8")
     version = header(text, "Version")
-    if not re.fullmatch(r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)", version, re.ASCII):
-        raise ValueError("The release plugin header must contain a stable X.Y.Z version.")
+    stable_pattern = r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)"
+    version_pattern = stable_pattern + (r"(?:-dev)?" if candidate else "")
+    if not re.fullmatch(version_pattern, version, re.ASCII):
+        raise ValueError("Invalid candidate version." if candidate else
+                         "The release plugin header must contain a stable X.Y.Z version.")
     requires_php = header(text, "Requires PHP")
     if requires_php != "8.1":
         raise ValueError("The approved minimum PHP version is 8.1.")
@@ -63,6 +66,8 @@ def build(source, output, tested_wp):
         raise ValueError("Missing release license.")
     files.append(license_file)
     output.mkdir(parents=True, exist_ok=True)
+    if candidate and (output / MANIFEST).exists():
+        raise ValueError("Candidate output must not contain a release manifest.")
     archive = output / ZIP
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         for path in sorted(files):
@@ -82,8 +87,11 @@ def build(source, output, tested_wp):
         "tested_wp": tested_wp, "size": archive.stat().st_size,
         "sha256": digest.hexdigest(),
     }
-    (output / MANIFEST).write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"Prepared {SLUG} v{version}: {archive.name} and {MANIFEST}")
+    if candidate:
+        print(f"Staging only: {SLUG} {version}, {archive.name}, SHA-256 {manifest['sha256']}")
+    else:
+        (output / MANIFEST).write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        print(f"Prepared {SLUG} v{version}: {archive.name} and {MANIFEST}")
     return manifest
 
 
@@ -92,9 +100,12 @@ def main():
     parser.add_argument("--source", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--output", type=Path)
     parser.add_argument("--tested-wp", default="", help="WordPress version verified for this release (optional)")
+    parser.add_argument("--candidate", action="store_true", help="Build staging ZIP only, never a release manifest")
     args = parser.parse_args()
+    if args.candidate and args.output is None:
+        parser.error("--candidate requires an explicit staging --output directory")
     source = args.source.resolve()
-    build(source, args.output or source / "dist", args.tested_wp)
+    build(source, args.output or source / "dist", args.tested_wp, args.candidate)
 
 
 if __name__ == "__main__":

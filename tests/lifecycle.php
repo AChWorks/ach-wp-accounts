@@ -46,20 +46,26 @@ $g=fixtureUser('fixture_migration_g');
 $h=fixtureUser('fixture_migration_h');
 $i=fixtureUser('fixture_migration_i');
 $j=fixtureUser('fixture_migration_j');
+// Existing native sessions predate the migration; importing a mapping
+// must not confer new possession/session authority.
+$oldSessions=WP_Session_Tokens::get_instance($a);
+$oldToken=$oldSessions->create(time()+3600);
+$adminSessions=WP_Session_Tokens::get_instance($admin->ID);
+$adminToken=$adminSessions->create(time()+3600);
 Identity::bind($f,'09123330006','absent');
 Identity::bind($g,'09123330007','absent');
 $reserved=Identity::reserveRegistration('09123330008');
 $manifest=['evidence'=>'Synthetic reviewed source fixture; not a live Digits export','rows'=>[
-    ['user_id'=>$a,'mobile'=>'۰۹۱۲۳۳۳۰۰۰۱','verified'=>true,'verified_at'=>time()-1000],
-    ['user_id'=>$b,'mobile'=>'09123330002','verified'=>true],
-    ['user_id'=>$c,'mobile'=>'+989123330002','verified'=>false],
-    ['user_id'=>$d,'mobile'=>'09123330004','verified'=>false],
-    ['user_id'=>$e,'mobile'=>'invalid','verified'=>true],
-    ['user_id'=>$admin->ID,'mobile'=>'09123330005','verified'=>true],
-    ['user_id'=>$h,'mobile'=>'09123330006','verified'=>true],
-    ['user_id'=>$g,'mobile'=>'09123330009','verified'=>true],
-    ['user_id'=>$i,'mobile'=>'09123330008','verified'=>true],
-    ['user_id'=>$j,'mobile'=>'09123330010','verified'=>true],
+    ['user_id'=>$a,'mobile'=>'۰۹۱۲۳۳۳۰۰۰۱','selected'=>true],
+    ['user_id'=>$b,'mobile'=>'09123330002','selected'=>true],
+    ['user_id'=>$c,'mobile'=>'+989123330002','selected'=>false],
+    ['user_id'=>$d,'mobile'=>'09123330004','selected'=>false],
+    ['user_id'=>$e,'mobile'=>'invalid','selected'=>true],
+    ['user_id'=>$admin->ID,'mobile'=>'09123330005','selected'=>true],
+    ['user_id'=>$h,'mobile'=>'09123330006','selected'=>true],
+    ['user_id'=>$g,'mobile'=>'09123330009','selected'=>true],
+    ['user_id'=>$i,'mobile'=>'09123330008','selected'=>true],
+    ['user_id'=>$j,'mobile'=>'09123330010','selected'=>true],
 ]];
 $nativeCount=(int)$wpdb->get_var("SELECT COUNT(*) FROM $wpdb->users");
 $identityCount=(int)$wpdb->get_var("SELECT COUNT(*) FROM $table");
@@ -76,7 +82,7 @@ add_filter('pre_option_home',$alternateHome);
 lifeError(fn()=>Migration::run($manifest+['confirm'=>true,'digest'=>$preview['digest']],true),'confirmation_required');
 remove_filter('pre_option_home',$alternateHome);
 $states=Migration::run($manifest)['items'];
-lifeCheck(array_column($states,'state')===['ready','source_conflict','source_conflict','unverified','invalid_mobile',
+lifeCheck(array_column($states,'state')===['ready','source_conflict','source_conflict','excluded','invalid_mobile',
     'ineligible_account','identity_conflict','identity_conflict','identity_conflict','ready'],'Migration classification incorrect');
 lifeCheck(!str_contains(wp_json_encode($preview),'+989123330001') && !str_contains(wp_json_encode($preview),'Synthetic reviewed'),'Preview exposed raw manifest');
 lifeError(fn()=>Migration::run($manifest+['confirm'=>false,'digest'=>$preview['digest']],true),'confirmation_required');
@@ -92,14 +98,91 @@ if (function_exists('wp_get_ability')) {
 }
 lifeCheck(is_array($applied) && array_column($applied['items'],'state')===['imported','source_conflict'],'Exact confirmed page did not import');
 $imported=Identity::byUser($a);
+$privateBefore=Privacy::exportUser($a);
+lifeCheck(!str_contains(wp_json_encode($privateBefore),'Verified mobile number') && !str_contains(wp_json_encode($privateBefore),'Verification time (UTC)'), 'Privacy export fabricated proof');
 lifeCheck($imported && $imported->source==='digits' && $imported->source_ref===$preview['digest'] &&
-    (int)$imported->verified_at===$manifest['rows'][0]['verified_at'],'Migration evidence lost');
+    (int)$imported->verified_at===0,'Migration asserted possession or lost provenance');
 $again=Migration::run($manifest+['limit'=>2,'confirm'=>true,'digest'=>$preview['digest']],true);
 lifeCheck($again['items'][0]['state']==='already_bound' && Identity::byUser($a)->revision===$imported->revision,'Import retry rewrote identity');
 Identity::bind($j,'09123330011','absent'); // live change after preview
 $rest=Migration::run($manifest+['offset'=>2,'digest'=>$preview['digest'],'confirm'=>true],true);
 lifeCheck($rest['next_offset']===null && end($rest['items'])['state']==='identity_conflict' &&
     (int)$wpdb->get_var("SELECT COUNT(*) FROM $wpdb->users")===$nativeCount,'Migration overwrote a new binding or created users');
+
+// Rehearse the approved cutover: preserve the existing account and native
+// administrator, revoke only the migrated customer's old native sessions,
+// and require real OTP before checkout qualification.
+$settingsBefore=Settings::current();
+$settings=$settingsBefore; $settings['checkout_required']=true;
+update_option(Settings::OPTION,$settings,false);
+wp_set_current_user($a);
+$_COOKIE[LOGGED_IN_COOKIE]=wp_generate_auth_cookie($a,time()+3600,'logged_in',$oldToken);
+lifeCheck(SessionProof::currentToken($a)===$oldToken && !SessionProof::qualifies() &&
+    CheckoutGate::blocked() && (int)Identity::byUser($a)->verified_at===0,'Migration conferred possession on an old session');
+$oldSessions->destroy_all();
+lifeCheck(SessionProof::currentToken($a)==='' && $adminSessions->verify($adminToken),'Scoped native session revocation failed');
+wp_set_current_user(0);
+unset($_COOKIE[LOGGED_IN_COOKIE]);
+$oldNative=get_userdata($a);
+$otpCapture=static function($cookie):void { $_COOKIE[LOGGED_IN_COOKIE]=$cookie; };
+add_action('set_logged_in_cookie',$otpCapture);
+$wpdb->query("TRUNCATE TABLE ".Schema::table('limits')); // isolated fixture only
+$legacyFlow=new AccountFlow();
+$legacyBrowser=bin2hex(random_bytes(32));
+$legacyTicket=$legacyFlow->start($legacyBrowser,$imported->mobile,'login','account');
+$legacySender=new class implements SmsSender {
+    public string $code='';
+    public function id():string{return 'fixture';}
+    public function send(string $mobile,string $code,string $purpose):SendResult{
+        $this->code=$code;return new SendResult('accepted','fixture','legacy');
+    }
+};
+$legacyFlow->issue($legacyBrowser,$legacyTicket,'192.0.2.30',$legacySender);
+$wrong=$legacySender->code===str_repeat('0',strlen($legacySender->code)) ?
+    str_repeat('1',strlen($legacySender->code)) : str_repeat('0',strlen($legacySender->code));
+lifeError(fn()=> $legacyFlow->complete($legacyBrowser,$legacyTicket,$wrong),'invalid_proof');
+lifeCheck((int)Identity::byUser($a)->verified_at===0 && get_current_user_id()===0 && CheckoutGate::blocked(),
+    'Wrong OTP verified imported identity');
+$result=$legacyFlow->complete($legacyBrowser,$legacyTicket,$legacySender->code);
+$current=Identity::byUser($a);
+lifeCheck($result===['outcome'=>'authenticated','created'=>false] && get_current_user_id()===$a &&
+    SessionProof::qualifies() && !CheckoutGate::blocked() && $current->revision===$imported->revision &&
+    $current->source==='digits' && $current->source_ref===$preview['digest'] && (int)$current->verified_at>0 &&
+    get_userdata($a)->user_email===$oldNative->user_email && get_userdata($a)->user_pass===$oldNative->user_pass &&
+    get_userdata($a)->roles===$oldNative->roles &&
+    (int)$wpdb->get_var("SELECT COUNT(*) FROM $wpdb->users")===$nativeCount,
+    'First fresh OTP failed to preserve the legacy account and provenance');
+// Replaying the manifest must not erase newly established possession.
+wp_set_current_user($admin->ID);
+$afterOtp=Migration::run($manifest+['limit'=>2,'digest'=>$preview['digest'],'confirm'=>true],true);
+lifeCheck($afterOtp['items'][0]['state']==='already_bound' &&
+    (int)Identity::byUser($a)->verified_at===(int)$current->verified_at,'Import replay erased fresh verification');
+
+// An existing native password login on an imported phone-only account may
+// step up in-session, but never qualifies simply because the mapping exists.
+$phoneManifest=['evidence'=>'Synthetic existing phone-only mapping','rows'=>[
+    ['user_id'=>$d,'mobile'=>'09123330004','selected'=>true]
+]];
+$phonePreview=Migration::run($phoneManifest);
+$phoneApply=Migration::run($phoneManifest+['digest'=>$phonePreview['digest'],'confirm'=>true],true);
+lifeCheck($phoneApply['items'][0]['state']==='imported','Phone-only mapping failed');
+wp_set_current_user($d);
+wp_set_auth_cookie($d,false,true);
+$stepToken=SessionProof::currentToken($d);
+$pendingIdentity=Identity::byUser($d);
+lifeCheck($stepToken!=='' && (int)$pendingIdentity->verified_at===0 && CheckoutGate::blocked(),
+    'Imported phone-only mapping qualified before OTP');
+$stepBrowser=bin2hex(random_bytes(32));
+$stepTicket=$legacyFlow->start($stepBrowser,$pendingIdentity->mobile,'step_up','account');
+$legacyFlow->issue($stepBrowser,$stepTicket,'192.0.2.31',$legacySender);
+lifeCheck($legacyFlow->complete($stepBrowser,$stepTicket,$legacySender->code)===['outcome'=>'verified','created'=>false] &&
+    SessionProof::currentToken($d)===$stepToken && SessionProof::qualifies() &&
+    (int)Identity::byUser($d)->verified_at>0 && get_userdata($d)->user_email==='',
+    'Fresh step-up failed for imported phone-only account');
+remove_action('set_logged_in_cookie',$otpCapture);
+unset($_COOKIE[LOGGED_IN_COOKIE]);
+wp_set_current_user($admin->ID);
+update_option(Settings::OPTION,$settingsBefore,false);
 
 // Native account recovery never repeats an uncertain registration.
 $pending=Identity::byMobile('+989121111116');

@@ -43,8 +43,8 @@ final class Privacy
         $identity = Identity::byUser($id);
         $data = [];
         if ($identity) {
-            $data[] = ['name'=>__('Verified mobile number','ach-wp-accounts'),'value'=>$identity->mobile];
-            $data[] = ['name'=>__('Verification source','ach-wp-accounts'),'value'=>$identity->source];
+            $data[] = ['name'=>((int)$identity->verified_at>0 ? __('Verified mobile number','ach-wp-accounts') : __('Mobile number','ach-wp-accounts')),'value'=>$identity->mobile];
+            $data[] = ['name'=>__('Identity source','ach-wp-accounts'),'value'=>$identity->source];
             if ((int)$identity->verified_at>0) {
                 $data[] = ['name'=>__('Verification time (UTC)','ach-wp-accounts'),'value'=>gmdate('c',(int)$identity->verified_at)];
             }
@@ -132,7 +132,7 @@ final class Privacy
             $alternative = is_email($user->user_email) && wp_is_password_reset_allowed_for_user($id)===true;
             $removed = self::clearTemporary($id,$identity);
             if ($identity && !$alternative) {
-                return self::result($removed,true,[__('The verified mobile identity was retained because removing it could prevent account recovery. Arrange another native recovery method or delete the account explicitly.','ach-wp-accounts')]);
+                return self::result($removed,true,[__('The mobile identity was retained because removing it could prevent account recovery. Arrange another native recovery method or delete the account explicitly.','ach-wp-accounts')]);
             }
             if ($identity) {
                 self::removeIdentity($id,$identity);

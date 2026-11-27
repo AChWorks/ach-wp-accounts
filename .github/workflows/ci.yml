@@ -37,3 +37,19 @@ jobs:
           node --check assets/admin.js
       - name: Run isolated WordPress and WooCommerce tests
         run: scripts/test-integration.sh
+      # The tested merge tree is recorded by Actions; verify that identity
+      # before installing the artifact. This is not a release or deployment.
+      - name: Prepare exact staging package
+        if: matrix.php == '8.5' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          git rev-parse HEAD HEAD^{tree}
+          python3 scripts/build-release.py --candidate --output "$RUNNER_TEMP/ach-wp-accounts-candidate"
+          sha256sum "$RUNNER_TEMP/ach-wp-accounts-candidate/ach-wp-accounts.zip"
+      - name: Upload staging ZIP as-is
+        if: matrix.php == '8.5' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          path: ${{ runner.temp }}/ach-wp-accounts-candidate/ach-wp-accounts.zip
+          archive: false
+          retention-days: 3
+          if-no-files-found: error
