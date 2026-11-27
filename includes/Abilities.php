@@ -34,7 +34,11 @@ final class Abilities
             'schema_version' => (int) get_option('ach_wp_accounts_schema_version', 0),
             'expected_schema_version' => Schema::VERSION,
             'schema_ready'=>Lifecycle::ready(),'schema_error'=>Lifecycle::error(),
-            'providers' => ProviderRegistry::capabilities(),
+            'providers' => array_map(static fn(array $provider): array => [
+                'id'=>$provider['id'], 'modes'=>$provider['modes'],
+                'pattern_parameters'=>$provider['pattern_parameters'],
+                'required_inputs'=>$provider['credential_fields'],
+            ],ProviderRegistry::capabilities()),
             'authentication_available' => BrowserApi::enabled(),
             'checkout_policy_available' => function_exists('WC'),
             'checkout_policy_enabled' => CheckoutGate::enabled(),
@@ -96,7 +100,7 @@ final class Abilities
             'purposes' => self::object(array_fill_keys(['login','link','step_up'], self::route())),
         ];
         if ($output) {
-            $providerProperties['credentials_set'] = self::list(self::enum(['api_key','username']));
+            $providerProperties['configured_inputs'] = self::list(self::enum(['api_key','username']));
         }
         $provider = self::object($providerProperties, $output ? array_keys($providerProperties) : []);
         $policy = [
@@ -175,8 +179,8 @@ final class Abilities
                 'id'=>self::string(),
                 'modes'=>self::list(self::string()),
                 'pattern_parameters'=>self::enum(['named','ordered']),
-                'credential_fields'=>self::list(self::string()),
-            ], ['id','modes','pattern_parameters','credential_fields'])),
+                'required_inputs'=>self::list(self::enum(['api_key','username'])),
+            ], ['id','modes','pattern_parameters','required_inputs'])),
             'authentication_available'=>['type'=>'boolean'],
             'checkout_policy_available'=>['type'=>'boolean'],
             'checkout_policy_enabled'=>['type'=>'boolean'],

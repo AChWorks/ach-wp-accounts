@@ -24,5 +24,8 @@ $admin = get_user_by('login','fixture_admin');
 wp_set_current_user($admin->ID);
 $result = $ability->execute();
 assertResult(is_array($result) && $result['schema_version'] === 1 && count($result['providers']) === 2 && !$result['authentication_available'] && !$result['checkout_policy_available'], 'Unexpected status output');
+assertResult($result['providers'][0]['required_inputs'] === ['api_key'] &&
+    $result['providers'][1]['required_inputs'] === ['username','api_key'] &&
+    !isset($result['providers'][0]['credential_fields']), 'Operator status must contain only symbolic configuration input names');
 assertResult($ability->get_meta_item('annotations')['readonly'] === true, 'Missing readonly annotation');
 echo "PASS: native ability registration, status schema and permission checks\n";

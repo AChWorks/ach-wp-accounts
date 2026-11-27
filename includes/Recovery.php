@@ -12,7 +12,7 @@ final class EmailRecovery
 {
     private const MARKER = '_ach_accounts_registration';
     private const VERIFIED = '_ach_accounts_verified_email';
-    private const QUERY = 'ach_confirm_email';
+    public const QUERY = 'ach_confirm_email';
     private static ?object $confirming = null;
 
     public static function managed(int $userId): bool

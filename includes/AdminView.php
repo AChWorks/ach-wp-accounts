@@ -387,7 +387,7 @@ final class AdminView
                 continue;
             }
             foreach ($capability['credential_fields'] as $key) {
-                $set = in_array($key,$provider['credentials_set'] ?? [],true);
+                $set = in_array($key,$provider['configured_inputs'] ?? [],true);
                 self::input('credentials['.$key.']',$key==='username' ? __('Provider username','ach-wp-accounts') : __('API key','ach-wp-accounts'),
                     '', 'password',$set ? __('Saved — leave blank to keep','ach-wp-accounts') : __('Not saved','ach-wp-accounts'),true);
             }

@@ -149,7 +149,7 @@ opsCheck($calls===0 && $saved['auth_enabled'] && $saved['checkout_required'] && 
     Settings::policy()->siteHourly===4, 'Saved settings not applied');
 opsCheck(!str_contains(json_encode($saved),'fixture-secret') && !str_contains(json_encode($saved),'fixture-other-secret') &&
     !str_contains(json_encode($saved),'fixture-name') &&
-    $saved['providers']->kavenegar['credentials_set']===['api_key'], 'Secret output leakage');
+    $saved['providers']->kavenegar['configured_inputs']===['api_key'], 'Secret output leakage');
 opsCheck(Abilities::status()['provider_configured'] && Abilities::status()['compatible_origin'], 'Readiness status incorrect');
 opsError(fn()=>Settings::update(['checkout_required'=>false],$default['revision']),'settings_conflict');
 opsError(fn()=>saveSettings(['auth_enabled'=>false]),'authentication_required');

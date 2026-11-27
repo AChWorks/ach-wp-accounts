@@ -117,13 +117,18 @@ final class Frontend
 
     public static function loginAssets(): void
     {
-        if (self::normalLogin()) {
-            if (str_contains(self::redirectParam('redirect_to', ''), 'newuseremail=')) {
+        $return = self::redirectParam('redirect_to', '');
+        $query = wp_parse_url($return, PHP_URL_QUERY);
+        if (is_string($query)) {
+            parse_str($query,$params);
+            if (isset($params[EmailRecovery::QUERY]) || isset($params['newuseremail'])) {
                 nocache_headers();
                 if (!headers_sent()) {
                     header('Referrer-Policy: no-referrer', true);
                 }
             }
+        }
+        if (self::normalLogin()) {
             self::assets();
         }
     }

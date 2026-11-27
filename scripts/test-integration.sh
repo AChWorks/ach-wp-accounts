@@ -95,6 +95,16 @@ PHP
 if [[ -n "${WP_CLI_PHAR:-}" ]]; then
     "$php_bin" "$repo/tests/cli.php"
 fi
+# Optional exact external integration packages, supplied by the operator.
+# Install only into this disposable fixture; no runtime dependency or CI download.
+if [[ -n "${BRIDGE_ARCHIVE:-}" || -n "${ADAPTER_ARCHIVE:-}" ]]; then
+    : "${BRIDGE_ARCHIVE:?Supply the reviewed Bridge ZIP}"
+    : "${ADAPTER_ARCHIVE:?Supply the reviewed MCP Adapter ZIP}"
+    unzip -q "$BRIDGE_ARCHIVE" -d "$lab/wordpress/wp-content/plugins"
+    unzip -q "$ADAPTER_ARCHIVE" -d "$lab/wordpress/wp-content/plugins"
+    "$php_bin" "$repo/tests/bridge.php" activate
+    "$php_bin" "$repo/tests/bridge.php"
+fi
 # Simulate a reviewed stable release without tagging or publishing.
 release_source="$lab/release-source"
 mkdir "$release_source"

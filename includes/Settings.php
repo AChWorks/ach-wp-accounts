@@ -134,7 +134,7 @@ final class Settings
                 continue;
             }
             $providers[$id] = [
-                'credentials_set' => array_values(array_filter(self::credentialKeys($id),
+                'configured_inputs' => array_values(array_filter(self::credentialKeys($id),
                     static fn ($key) => is_string($config['credentials'][$key] ?? null) && $config['credentials'][$key] !== '')),
                 'default' => $default,
                 'purposes' => (object)$purposes,
