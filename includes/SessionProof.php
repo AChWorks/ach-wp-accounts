@@ -11,7 +11,7 @@ final class SessionProof
 {
     private static function hash(#[\SensitiveParameter] string $token): string
     {
-        return hash_hmac('sha256', "ach-wpa-session\0" . $token, wp_salt('auth'));
+        return hash_hmac('sha256', "ach-wpa-session\0" . Lifecycle::epoch() . "\0" . $token, wp_salt('auth'));
     }
 
     public static function currentToken(int $userId): string
@@ -44,6 +44,7 @@ final class SessionProof
 
     public static function qualifies(?int $maxAge = null): bool
     {
+        if (!Lifecycle::ready()) { return false; }
         $userId = get_current_user_id();
         $token = self::currentToken($userId);
         if ($token === '') {
@@ -76,6 +77,7 @@ final class SessionProof
     /** Internal only: caller has just consumed purpose-bound OTP proof. */
     public static function record(int $userId, #[\SensitiveParameter] string $token, object $identity): void
     {
+        if (!Lifecycle::ready()) { throw new VerificationError('storage_unavailable'); }
         global $wpdb;
         $native = $token !== '' ? \WP_Session_Tokens::get_instance($userId)->get($token) : null;
         $current = Identity::byUser($userId);
@@ -101,7 +103,7 @@ final class SessionProof
 
     public static function forget(#[\SensitiveParameter] string $token): void
     {
-        if ($token === '') {
+        if ($token === '' || !Lifecycle::ready()) {
             return;
         }
         global $wpdb;

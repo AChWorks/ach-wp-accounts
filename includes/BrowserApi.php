@@ -10,14 +10,29 @@ final class BrowserApi
 
     public static function enabled(): bool
     {
-        return !is_multisite() && Settings::flag('auth_enabled') &&
-            (int) get_option('ach_wp_accounts_schema_version', 0) === Schema::VERSION;
+        return Lifecycle::ready() && Settings::flag('auth_enabled') && self::compatibleOrigin();
     }
 
     public static function hooks(): void
     {
         add_action('wp_ajax_' . self::ACTION, [self::class, 'dispatch']);
         add_action('wp_ajax_nopriv_' . self::ACTION, [self::class, 'dispatch']);
+        // A guest ticket must not revive after a login/logout round trip.
+        add_action('wp_login', [self::class, 'forgetBrowser'], 10, 0);
+        add_action('clear_auth_cookie', [self::class, 'forgetBrowser'], 10, 0);
+    }
+
+    public static function forgetBrowser(): void
+    {
+        $name = self::cookieName();
+        if (!isset($_COOKIE[$name])) { return; }
+        unset($_COOKIE[$name]);
+        if (is_ssl() && !headers_sent()) {
+            setcookie($name, '', [
+                'expires' => time() - HOUR_IN_SECONDS, 'path' => '/',
+                'secure' => true, 'httponly' => true, 'samesite' => 'Strict',
+            ]);
+        }
     }
 
     private static function origin(string $url): string

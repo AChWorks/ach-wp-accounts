@@ -2,13 +2,13 @@
 
 A focused WordPress account extension: unified passwordless mobile login and registration, verified account identities, WooCommerce integration, and extensible messaging providers.
 
-**Development status:** verification, messaging, native account/session flows, shared customer UI, optional native recovery enrollment and core WooCommerce checkout guards are implemented in the development candidate. Native email registration/login remains subject to site policy independently of the mobile checkout requirement. Native administration, the shared operator settings service, protected native Abilities, provider tests, bounded diagnostics, runtime-only release packaging and native GitHub update discovery/installation are implemented in the development candidate and exercised in isolated fixtures. Controlled recovery/lifecycle, migration, staging acceptance and independent review remain in progress. No production-ready release exists.
+**Development status:** the candidate implements mobile authentication and registration, native account linking and recovery, both SMS adapters, shared customer/admin UI, WooCommerce checkout qualification, operator Abilities, reviewed Digits mapping import, interrupted-registration reconciliation, versioned installation, privacy operations and explicit local purge, runtime-only release packaging and native GitHub updates. Isolated WordPress-only and WooCommerce integration fixtures exercise the native account lifecycle, successful fixture-gateway payments, migration and maintenance operations. Real provider credentials/delivery, the actual legacy mapping, target-store integrations, browser/cache staging acceptance and independent review remain separate release gates. No production-ready release exists.
 
 - [Project specification and architecture](docs/PROJECT-SPEC.md) — canonical product intent, contracts, implementation boundaries and acceptance criteria.
 - [Development and verification](docs/DEVELOPMENT.md) — reproducible fixtures, implemented boundaries and provider contracts.
 - [GitHub Issues](https://github.com/AChWorks/ach-wp-accounts/issues) — implementation work and unresolved decisions.
 
-The plugin will reuse WordPress users, roles, sessions, and WooCommerce account/order ownership. It will work without WooCommerce; commerce integrations are optional. English source and Persian translations are required.
+The plugin reuses WordPress users, roles, sessions, and WooCommerce account/order ownership. WooCommerce is optional. English source and Persian translations are included.
 
 ## Distribution
 

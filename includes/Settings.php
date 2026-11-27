@@ -275,6 +275,9 @@ final class Settings
     public static function update(#[\SensitiveParameter] array $patch, string $revision, bool $writeCredentials = false): array
     {
         self::requireOperator();
+        if ((int)get_option(Lifecycle::VERSION_OPTION,0)>Schema::VERSION) {
+            throw new SettingsError('schema','schema_unsupported');
+        }
         global $wpdb;
         self::keys($patch, ['auth_enabled','allow_registration','checkout_required','selected_provider',
             'providers','verification','diagnostics_retention_hours'], '');
@@ -350,7 +353,7 @@ final class Settings
             if ($next['auth_enabled']) {
                 // Check actual HTTPS origin compatibility, not connectivity.
                 if (!BrowserApi::compatibleOrigin() || is_multisite() ||
-                    (int)get_option('ach_wp_accounts_schema_version', 0) !== Schema::VERSION) {
+                    !Lifecycle::ready()) {
                     throw new SettingsError('auth_enabled', 'environment_unavailable');
                 }
             }

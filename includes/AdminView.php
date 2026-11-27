@@ -219,8 +219,11 @@ final class AdminView
         }
         echo '</dl>';
         self::paragraph(__('Connection history reflects earlier tests, not a live health or delivery guarantee.','ach-wp-accounts'));
-        if (!$status['compatible_origin'] || $status['schema_version'] !== $status['expected_schema_version'] || !$status['cleanup_scheduled']) {
+        if (!$status['compatible_origin'] || !$status['schema_ready'] || !$status['cleanup_scheduled']) {
             self::notice(__('Check HTTPS origin, database schema and scheduled cleanup before enabling mobile sign-in.','ach-wp-accounts'));
+            if ($status['schema_error']!=='') {
+                echo '<p><code dir="ltr">'.esc_html($status['schema_error']).'</code></p>';
+            }
         }
         if ($settings['auth_enabled'] && !$status['provider_configured']) {
             self::notice(__('Mobile sign-in is enabled but the saved provider is not ready. Review SMS settings.','ach-wp-accounts'));

@@ -7,17 +7,18 @@ defined('ABSPATH') || exit;
 final class Schema
 {
     public const VERSION = 1;
+    public const TABLES = ['identities','challenges','limits','session_proofs','events','recovery_emails'];
 
     public static function table(string $name): string
     {
         global $wpdb;
-        if (!in_array($name, ['identities', 'challenges', 'limits', 'session_proofs', 'events'], true)) {
+        if (!in_array($name, self::TABLES, true)) {
             throw new \InvalidArgumentException('Unknown accounts table.');
         }
         return $wpdb->prefix . 'ach_accounts_' . $name;
     }
 
-    public static function install(): void
+    public static function install(bool $create = true): void
     {
         global $wpdb;
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -27,19 +28,24 @@ final class Schema
         $collation = $wpdb->get_charset_collate();
 
         // User IDs remain owned by WordPress. No billing field is an identity.
-        dbDelta("CREATE TABLE $identities (
+        $definitions[] = "CREATE TABLE $identities (
             mobile varchar(16) NOT NULL,
             user_id bigint(20) unsigned DEFAULT NULL,
             revision char(32) NOT NULL,
             verified_at bigint(20) unsigned NOT NULL,
             registration_login varchar(60) NOT NULL DEFAULT '',
+            registration_started smallint(5) unsigned NOT NULL DEFAULT 0,
+            source varchar(16) NOT NULL DEFAULT 'otp',
+            source_ref char(64) NOT NULL DEFAULT '',
             PRIMARY KEY  (mobile),
-            UNIQUE KEY user_id (user_id)
-        ) ENGINE=InnoDB $collation;");
-        dbDelta("CREATE TABLE $challenges (
+            UNIQUE KEY user_id (user_id),
+            UNIQUE KEY revision (revision)
+        ) ENGINE=InnoDB $collation;";
+        $definitions[] = "CREATE TABLE $challenges (
             id char(32) NOT NULL,
             reservation_id char(32) NOT NULL,
             mobile varchar(16) NOT NULL,
+            identity_revision char(32) NOT NULL DEFAULT '',
             purpose varchar(32) NOT NULL,
             flow_hash char(64) NOT NULL,
             code_hash char(64) NOT NULL,
@@ -59,20 +65,21 @@ final class Schema
             consumed_at bigint(20) unsigned NOT NULL DEFAULT 0,
             retire_at bigint(20) unsigned NOT NULL,
             PRIMARY KEY  (id),
+            KEY mobile_revision (mobile,identity_revision),
             KEY chronology (created_at,id),
             KEY retire_at (retire_at)
-        ) ENGINE=InnoDB $collation;");
-        dbDelta("CREATE TABLE $limits (
+        ) ENGINE=InnoDB $collation;";
+        $definitions[] = "CREATE TABLE $limits (
             bucket_key char(64) NOT NULL,
             hits int(10) unsigned NOT NULL DEFAULT 0,
             next_at bigint(20) unsigned NOT NULL DEFAULT 0,
             retire_at bigint(20) unsigned NOT NULL,
             PRIMARY KEY  (bucket_key),
             KEY retire_at (retire_at)
-        ) ENGINE=InnoDB $collation;");
+        ) ENGINE=InnoDB $collation;";
 
         $events = self::table('events');
-        dbDelta("CREATE TABLE $events (
+        $definitions[] = "CREATE TABLE $events (
             id char(32) NOT NULL,
             category varchar(24) NOT NULL,
             purpose varchar(32) NOT NULL DEFAULT '',
@@ -87,9 +94,9 @@ final class Schema
             PRIMARY KEY  (id),
             KEY chronology (created_at,id),
             KEY retire_at (retire_at)
-        ) ENGINE=InnoDB $collation;");
+        ) ENGINE=InnoDB $collation;";
         $sessions = self::table('session_proofs');
-        dbDelta("CREATE TABLE $sessions (
+        $definitions[] = "CREATE TABLE $sessions (
             token_hash char(64) NOT NULL,
             user_id bigint(20) unsigned NOT NULL,
             revision char(32) NOT NULL,
@@ -98,31 +105,82 @@ final class Schema
             PRIMARY KEY  (token_hash),
             KEY user_id (user_id),
             KEY retire_at (retire_at)
-        ) ENGINE=InnoDB $collation;");
+        ) ENGINE=InnoDB $collation;";
 
-        // dbDelta returning a description is not proof of successful DDL.
-        foreach ([$identities => ['PRIMARY' => 'mobile', 'user_id' => 'user_id'], $challenges => ['PRIMARY' => 'id'], $limits => ['PRIMARY' => 'bucket_key'], $sessions => ['PRIMARY' => 'token_hash'], $events => ['PRIMARY' => 'id']] as $table => $required) {
-            $status = $wpdb->get_row($wpdb->prepare('SHOW TABLE STATUS WHERE Name = %s', $table));
-            if (!$status || strcasecmp((string) $status->Engine, 'InnoDB') !== 0) {
-                throw new \RuntimeException('Required transactional accounts table unavailable.');
-            }
-            $indexes = $wpdb->get_results("SHOW INDEX FROM `$table`");
-            foreach ($required as $index => $column) {
-                $parts = array_values(array_filter($indexes, static fn ($row) => $row->Key_name === $index));
-                if (count($parts) !== 1 || $parts[0]->Column_name !== $column || (int) $parts[0]->Non_unique !== 0 || $parts[0]->Sub_part !== null) {
-                    throw new \RuntimeException('Required accounts uniqueness constraint unavailable.');
+        $recovery = self::table('recovery_emails');
+        $definitions[] = "CREATE TABLE $recovery (
+            user_id bigint(20) unsigned NOT NULL,
+            token_hash char(64) NOT NULL,
+            new_email varchar(100) NOT NULL,
+            previous_email varchar(100) NOT NULL,
+            identity_revision char(32) NOT NULL,
+            epoch char(32) NOT NULL,
+            retire_at bigint(20) unsigned NOT NULL,
+            PRIMARY KEY  (user_id),
+            KEY retire_at (retire_at)
+        ) ENGINE=InnoDB $collation;";
+        foreach ($definitions as $definition) {
+            if ($create) { dbDelta($definition); }
+            self::verify($definition);
+        }
+    }
+
+    /** Inspect the actual columns/indexes; dbDelta's description is not proof. */
+    private static function verify(string $definition): void
+    {
+        global $wpdb;
+        if (!preg_match('/CREATE TABLE ([^ ]+) \\(/',$definition,$m)) {
+            throw new \RuntimeException('Invalid accounts schema definition.');
+        }
+        $table = $m[1];
+        $status = $wpdb->get_row($wpdb->prepare('SHOW TABLE STATUS WHERE Name = %s',$table));
+        if (!$status || strcasecmp((string)$status->Engine,'InnoDB') !== 0) {
+            throw new \RuntimeException('Required transactional accounts table unavailable.');
+        }
+        $columns = [];
+        foreach ($wpdb->get_results("SHOW COLUMNS FROM `$table`") as $column) {
+            $columns[$column->Field] = $column;
+        }
+        $indexes = [];
+        foreach ($wpdb->get_results("SHOW INDEX FROM `$table`") as $index) {
+            $indexes[$index->Key_name][(int)$index->Seq_in_index] = $index;
+        }
+        // Integer display widths differ between supported MySQL/MariaDB
+        // releases but do not affect storage or range.
+        $type = static fn(string $value): string => preg_replace('/\\b(bigint|smallint|int)\\([0-9]+\\)/i','$1',strtolower($value));
+        foreach (explode("\n",$definition) as $line) {
+            $line = trim($line," \t,");
+            if (preg_match('/^([a-z_]+) ((?:varchar|char|bigint|smallint|int)\\([0-9]+\\)(?: unsigned)?)(.*)$/i',$line,$m)) {
+                $actual = $columns[$m[1]] ?? null;
+                if (!$actual || $type($actual->Type) !== $type($m[2]) ||
+                    $actual->Null !== (str_contains($m[3],'NOT NULL') ? 'NO' : 'YES')) {
+                    throw new \RuntimeException('Required accounts column unavailable: '.$m[1]);
+                }
+            } elseif (preg_match('/^(PRIMARY KEY|UNIQUE KEY|KEY)\\s*(?:([a-z_]+)\\s*)?\\(([^)]+)\\)$/i',$line,$m)) {
+                $name = $m[1] === 'PRIMARY KEY' ? 'PRIMARY' : $m[2];
+                $parts = $indexes[$name] ?? [];
+                ksort($parts);
+                $expected = explode(',',$m[3]);
+                if (count($parts)!==count($expected)) {
+                    throw new \RuntimeException('Required accounts index unavailable: '.$name);
+                }
+                foreach (array_values($parts) as $i=>$part) {
+                    if ($part->Column_name !== trim($expected[$i]) || $part->Sub_part !== null ||
+                        (int)$part->Non_unique !== ($m[1] === 'KEY' ? 1 : 0)) {
+                        throw new \RuntimeException('Required accounts index incompatible: '.$name);
+                    }
                 }
             }
         }
-        update_option('ach_wp_accounts_schema_version', self::VERSION, false);
     }
 
     public static function cleanup(): void
     {
+        if (!Lifecycle::ready()) { return; }
         global $wpdb;
         $more = false;
         $now = time();
-        foreach (['challenges', 'limits', 'session_proofs', 'events'] as $name) {
+        foreach (['challenges', 'limits', 'session_proofs', 'events', 'recovery_emails'] as $name) {
             $table = self::table($name);
             $where = 'retire_at <= %d';
             $args = [$now];

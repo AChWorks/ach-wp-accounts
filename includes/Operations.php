@@ -37,6 +37,9 @@ final class Operations
     public static function testSend(string $mobile, string $purpose, string $requestId, bool $confirmed, ?string $provider = null, ?string $revision = null): array
     {
         Settings::requireOperator();
+        if (!Lifecycle::ready()) {
+            throw new SettingsError('schema','storage_unavailable');
+        }
         if (!$confirmed) {
             throw new SettingsError('confirm_send', 'confirmation_required');
         }

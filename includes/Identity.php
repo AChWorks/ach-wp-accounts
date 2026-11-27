@@ -75,19 +75,33 @@ final class Identity
         return (object) ['mobile' => $mobile, 'revision' => $revision, 'registration_login' => $login];
     }
 
+    /** Durable fence: an operator cannot release a reservation after this. */
+    public static function markRegistrationStarted(object $reservation): void
+    {
+        global $wpdb;
+        $table = Schema::table('identities');
+        if (self::write($wpdb->prepare(
+            "UPDATE $table SET registration_started=1 WHERE mobile=%s AND revision=%s AND registration_login=%s
+             AND user_id IS NULL AND registration_started=0",
+            $reservation->mobile,$reservation->revision,$reservation->registration_login
+        ))!==1) {
+            throw new VerificationError('registration_pending');
+        }
+    }
+
     public static function finishRegistration(object $reservation, int $userId): object
     {
         global $wpdb;
         $table = Schema::table('identities');
         $user = get_userdata($userId);
-        if (!$user || $user->user_login !== $reservation->registration_login ||
+        if (!$user || !AccountPolicy::ordinary($user) || $user->user_email!=='' || $user->user_login !== $reservation->registration_login ||
             get_user_meta($userId, '_ach_accounts_registration', true) !== $reservation->revision) {
             throw new VerificationError('registration_pending');
         }
         $revision = bin2hex(random_bytes(16));
         $changed = self::write($wpdb->prepare(
-            "UPDATE $table SET user_id=%d,revision=%s,verified_at=%d,registration_login=''
-             WHERE mobile=%s AND revision=%s AND registration_login=%s AND user_id IS NULL",
+            "UPDATE $table SET user_id=%d,revision=%s,verified_at=%d,registration_login='',registration_started=0
+             WHERE mobile=%s AND revision=%s AND registration_login=%s AND user_id IS NULL AND registration_started=1",
             $userId, $revision, time(), $reservation->mobile, $reservation->revision, $reservation->registration_login
         ));
         if ($changed !== 1) {
@@ -101,14 +115,14 @@ final class Identity
     }
 
     /** Release a reservation only before any native user creation has started. */
-    public static function abandonUnstartedRegistration(object $reservation): void
+    public static function abandonUnstartedRegistration(object $reservation): bool
     {
         global $wpdb;
         $table = Schema::table('identities');
-        self::write($wpdb->prepare(
-            "DELETE FROM $table WHERE mobile=%s AND revision=%s AND registration_login=%s AND user_id IS NULL",
+        return self::write($wpdb->prepare(
+            "DELETE FROM $table WHERE mobile=%s AND revision=%s AND registration_login=%s AND user_id IS NULL AND registration_started=0",
             $reservation->mobile, $reservation->revision, $reservation->registration_login
-        ));
+        ))===1;
     }
 
     /**
@@ -131,7 +145,7 @@ final class Identity
             ));
         } else {
             $changed = self::write($wpdb->prepare(
-                "UPDATE $table SET mobile=%s,revision=%s,verified_at=%d
+                "UPDATE $table SET mobile=%s,revision=%s,verified_at=%d,source='otp',source_ref=''
                  WHERE user_id=%d AND revision=%s",
                 $mobile, $revision, time(), $userId, $expectedRevision
             ));
@@ -146,12 +160,28 @@ final class Identity
         return $identity;
     }
 
-    public static function deleteForUser(int $userId): void
+    /** Only the explicit reviewed migration service may call this. */
+    public static function importVerified(int $userId,string $mobile,int $verifiedAt,string $digest): void
     {
         global $wpdb;
-        // Called only after native user deletion has succeeded.
-        foreach (['identities', 'session_proofs'] as $name) {
-            $wpdb->delete(Schema::table($name), ['user_id' => $userId], ['%d']);
+        $mobile = Mobile::normalize($mobile);
+        if (!Lifecycle::ready() || $userId<1 || $verifiedAt<0 || $verifiedAt>time() ||
+            !preg_match('/\\A[0-9a-f]{64}\\z/D',$digest)) {
+            throw new VerificationError('invalid_context');
+        }
+        $user = get_userdata($userId);
+        if (!$user || !AccountPolicy::ordinary($user)) {
+            throw new VerificationError('identity_conflict');
+        }
+        $table = Schema::table('identities');
+        $revision = bin2hex(random_bytes(16));
+        if (self::write($wpdb->prepare(
+            "INSERT INTO $table (mobile,user_id,revision,verified_at,source,source_ref)
+             SELECT %s,ID,%s,%d,'digits',%s FROM $wpdb->users WHERE ID=%d",
+            $mobile,$revision,$verifiedAt,$digest,$userId
+        ))!==1) {
+            throw new VerificationError('identity_conflict');
         }
     }
+
 }

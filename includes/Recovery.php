@@ -12,7 +12,8 @@ final class EmailRecovery
 {
     private const MARKER = '_ach_accounts_registration';
     private const VERIFIED = '_ach_accounts_verified_email';
-    private const PENDING = '_new_email'; // Native WP profile confirmation record.
+    private const QUERY = 'ach_confirm_email';
+    private static ?object $confirming = null;
 
     public static function managed(int $userId): bool
     {
@@ -46,103 +47,151 @@ final class EmailRecovery
         return $user;
     }
 
-    /**
-     * Request the native WordPress confirmation link. We use the existing core
-     * profile confirmation record/handler, with a bounded lifetime and identity
-     * revision for requests from this form, rather than an email OTP/login route.
-     */
+    /** Request a native-account email confirmation, never a login token. */
     public static function request(string $email): array
     {
         $user = self::requireAuthority();
         $email = trim($email);
-        if (!is_email($email) || sanitize_email($email) !== $email) {
+        // Match the actual native users.user_email storage width.
+        if (!is_email($email) || sanitize_email($email) !== $email || strlen($email)>100) {
             throw new VerificationError('invalid_email');
         }
         $owner = email_exists($email);
-        if ($owner && (int) $owner !== $user->ID) {
+        if ($owner && (int)$owner !== $user->ID) {
             throw new VerificationError('email_unavailable');
         }
-        if ($user->user_email === $email && self::allow(true, $user->ID)) {
-            return ['outcome' => 'already_confirmed'];
+        if ($user->user_email === $email && self::allow(true,$user->ID)) {
+            return ['outcome'=>'already_confirmed'];
         }
-        AccountPolicy::reserveAccountAction('recovery_email', $user->ID, 5);
-        $identity = Identity::byUser($user->ID);
-        if (!$identity) {
-            throw new VerificationError('invalid_context');
-        }
-        $record = [
-            'hash' => bin2hex(random_bytes(32)),
-            'newemail' => $email,
-            'ach_revision' => $identity->revision,
-            'ach_previous_email' => $user->user_email,
-            'ach_expires' => time() + DAY_IN_SECONDS,
-        ];
-        if (update_user_meta($user->ID, self::PENDING, $record) === false) {
-            throw new VerificationError('storage_unavailable');
-        }
-        $link = add_query_arg('newuseremail', $record['hash'], admin_url('profile.php', 'https'));
+        AccountPolicy::reserveAccountAction('recovery_email',$user->ID,5);
+        $token = bin2hex(random_bytes(32));
+        DatabaseLock::run('recovery-email-'.$user->ID,static function () use ($user,$email,$token): void {
+            global $wpdb;
+            $current = self::requireAuthority();
+            $identity = Identity::byUser($current->ID);
+            if ($current->ID !== $user->ID || !$identity || !Lifecycle::ready()) {
+                throw new VerificationError('invalid_context');
+            }
+            $table = Schema::table('recovery_emails');
+            $old = $wpdb->suppress_errors(true);
+            try {
+                $result = $wpdb->query($wpdb->prepare(
+                    "INSERT INTO $table (user_id,token_hash,new_email,previous_email,identity_revision,epoch,retire_at)
+                     VALUES (%d,%s,%s,%s,%s,%s,%d)
+                     ON DUPLICATE KEY UPDATE token_hash=VALUES(token_hash),new_email=VALUES(new_email),
+                     previous_email=VALUES(previous_email),identity_revision=VALUES(identity_revision),
+                     epoch=VALUES(epoch),retire_at=VALUES(retire_at)",
+                    $current->ID,hash('sha256',$token),$email,$current->user_email,$identity->revision,
+                    Lifecycle::epoch(),time()+DAY_IN_SECONDS
+                ));
+                if ($result === false) {
+                    throw new VerificationError('storage_unavailable');
+                }
+            } finally { $wpdb->suppress_errors($old); }
+        });
+        $link = add_query_arg(self::QUERY,$token,admin_url('profile.php','https'));
         $name = wp_specialchars_decode(get_option('blogname'), ENT_QUOTES);
         $subject = sprintf(__('Confirm your recovery email for %s', 'ach-wp-accounts'), $name);
         $message = sprintf(
-            /* translators: %s: native WordPress email confirmation link. */
+            /* translators: %s: email confirmation link. */
             __("To confirm this email address for your account, open the link below while signed in. The link expires in 24 hours.\n\n%s\n\nIf you did not request this change, ignore this message.", 'ach-wp-accounts'),
             $link
         );
-        if (!wp_mail($email, $subject, $message)) {
-            // The mail transport may have accepted a message before reporting
-            // failure. Retain the pending record and never automatically retry.
+        if (!wp_mail($email,$subject,$message)) {
+            // A transport failure may still mean delivery. Never resend blindly.
             throw new VerificationError('email_send_failed');
         }
-        return ['outcome' => 'confirmation_requested'];
+        return ['outcome'=>'confirmation_requested'];
     }
 
-    /** Current user + matching native confirmation record, never arbitrary GET. */
-    private static function pendingConfirmation(int $userId, ?string $previousEmail = null): ?array
+    /** Verify the actual signed-in account, binding, epoch and one-use token. */
+    public static function confirm(#[\SensitiveParameter] string $token): void
     {
-        global $pagenow;
-        $token = $_GET['newuseremail'] ?? null;
-        if (!self::managed($userId) || get_current_user_id() !== $userId ||
-            ($pagenow !== 'profile.php' && !(defined('IS_PROFILE_PAGE') && IS_PROFILE_PAGE)) ||
-            !is_string($token) || SessionProof::currentToken($userId) === '') {
-            return null;
+        $id = get_current_user_id();
+        if (!Lifecycle::ready() || !self::managed($id) || SessionProof::currentToken($id)==='' ||
+            !preg_match('/\\A[0-9a-f]{64}\\z/D',$token)) {
+            throw new VerificationError('invalid_context');
         }
-        $record = get_user_meta($userId, self::PENDING, true);
-        if (!is_array($record) || !is_string($record['hash'] ?? null) ||
-            !is_string($record['newemail'] ?? null) || !is_email($record['newemail']) ||
-            !hash_equals($record['hash'], wp_unslash($token))) {
-            return null;
-        }
-        if (isset($record['ach_expires'])) {
-            $identity = Identity::byUser($userId);
-            $user = get_userdata($userId);
-            if (!$identity || !$user || (int)$record['ach_expires'] <= time() ||
-                ($record['ach_revision'] ?? '') !== $identity->revision ||
-                ($record['ach_previous_email'] ?? null) !== ($previousEmail ?? $user->user_email)) {
-                return null;
-            }
-        }
-        return $record;
+        DatabaseLock::run('recovery-email-'.$id,static function () use ($id,$token): void {
+            global $wpdb;
+            $table = Schema::table('recovery_emails');
+            $old = $wpdb->suppress_errors(true);
+            try {
+                $record = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE user_id=%d",$id));
+                $identity = Identity::byUser($id);
+                $user = get_userdata($id);
+                if (!$record || !$identity || !$user || !AccountPolicy::ordinary($user) ||
+                    (int)$record->retire_at<=time() || $record->epoch!==Lifecycle::epoch() ||
+                    !hash_equals($record->token_hash,hash('sha256',$token)) ||
+                    $record->identity_revision!==$identity->revision || $record->previous_email!==$user->user_email ||
+                    !is_email($record->new_email) || SessionProof::currentToken($id)==='') {
+                    throw new VerificationError('invalid_context');
+                }
+                $owner = email_exists($record->new_email);
+                if ($owner && (int)$owner!==$id) {
+                    throw new VerificationError('email_unavailable');
+                }
+                // Atomically consume BEFORE the native update. If the outcome
+                // is uncertain, a new deliberate enrollment is required.
+                if ($wpdb->query($wpdb->prepare("DELETE FROM $table WHERE user_id=%d AND token_hash=%s AND retire_at>%d",
+                    $id,$record->token_hash,time()))!==1) {
+                    throw new VerificationError('invalid_context');
+                }
+                self::$confirming = $record;
+                try {
+                    $result = wp_update_user(['ID'=>$id,'user_email'=>$record->new_email]);
+                    $fresh = get_userdata($id);
+                    if (is_wp_error($result) || (int)$result!==$id || !$fresh || $fresh->user_email!==$record->new_email) {
+                        throw new VerificationError('storage_unavailable');
+                    }
+                    update_user_meta($id,self::VERIFIED,self::fingerprint($fresh->user_email));
+                    if (!self::allow(true,$id)) {
+                        throw new VerificationError('storage_unavailable');
+                    }
+                } finally { self::$confirming = null; }
+            } finally { $wpdb->suppress_errors($old); }
+        });
     }
 
-    /** WC normally redirects customers away from wp-admin; exempt only a valid self-confirmation. */
-    public static function allowNativeConfirmation(bool $prevent): bool
-    {
-        return $prevent && self::pendingConfirmation(get_current_user_id()) !== null ? false : $prevent;
-    }
-
-    public static function rejectInvalidConfirmation(): void
+    /** Keep the existing native profile link/redirect UX, not core pending state. */
+    public static function handleConfirmation(): void
     {
         global $pagenow;
         $id = get_current_user_id();
-        if ($pagenow === 'profile.php' && isset($_GET['newuseremail']) && self::managed($id)) {
-            nocache_headers();
-            if (!headers_sent()) {
-                header('Referrer-Policy: no-referrer', true);
-            }
-            if (self::pendingConfirmation($id) === null) {
-                wp_die(esc_html__('This email confirmation link is invalid or expired. Return to your account and request a new link.', 'ach-wp-accounts'), '', ['response' => 400, 'back_link' => true]);
-            }
+        if (!self::managed($id)) { return; }
+        // Core's native email confirmation has no plugin proof/expiry contract.
+        remove_action('personal_options_update','send_confirmation_on_profile_email');
+        if ($pagenow!=='profile.php' || (!isset($_GET[self::QUERY]) && !isset($_GET['newuseremail']))) {
+            return;
         }
+        nocache_headers();
+        if (!headers_sent()) {
+            header('Referrer-Policy: no-referrer',true);
+        }
+        try {
+            $token = $_GET[self::QUERY] ?? null;
+            if (!is_string($token) || isset($_GET['newuseremail']) || ($_SERVER['REQUEST_METHOD'] ?? '')!=='GET' || !is_ssl()) {
+                throw new VerificationError('invalid_context');
+            }
+            self::confirm(wp_unslash($token));
+            wp_safe_redirect(add_query_arg('updated','true',admin_url('profile.php','https')));
+            exit;
+        } catch (VerificationError $error) {
+            if ($error->getMessage()==='storage_unavailable') {
+                Diagnostics::accountFailure('storage_unavailable','recovery_email');
+                wp_die(esc_html__('Account data is temporarily unavailable.','ach-wp-accounts'),'', ['response'=>503,'back_link'=>true]);
+            }
+            wp_die(esc_html__('This email confirmation link is invalid or expired. Return to your account and request a new link.', 'ach-wp-accounts'), '', ['response'=>400,'back_link'=>true]);
+        } catch (\Throwable $error) {
+            Diagnostics::accountFailure('storage_unavailable','recovery_email');
+            wp_die(esc_html__('Account data is temporarily unavailable.','ach-wp-accounts'),'', ['response'=>503,'back_link'=>true]);
+        }
+    }
+
+    /** Prevent other native profile writes from creating a core pending record. */
+    public static function guardNativePending(mixed $check,int $userId,string $key): mixed
+    {
+        return $key==='_new_email' && self::managed($userId) ? false : $check;
     }
 
     /**
@@ -166,8 +215,11 @@ final class EmailRecovery
         if ($email === $old->user_email || $email === '') {
             return $data;
         }
-        $pending = self::pendingConfirmation($userId);
-        return $pending && $email === $pending['newemail'] ? $data : [];
+        $pending = self::$confirming;
+        $identity = $pending ? Identity::byUser($userId) : null;
+        return $pending && (int)$pending->user_id===$userId && $identity &&
+            $pending->identity_revision===$identity->revision && $pending->epoch===Lifecycle::epoch() &&
+            $pending->previous_email===$old->user_email && $email===$pending->new_email ? $data : [];
     }
 
     public static function profileUpdated(int $userId, \WP_User $old): void
@@ -177,12 +229,7 @@ final class EmailRecovery
             return;
         }
         delete_user_meta($userId, self::VERIFIED);
-        // Core consumes the pending confirmation after wp_update_user returns.
-        // At this point the previous-email snapshot is in $old, not the user row.
-        $pending = self::pendingConfirmation($userId, $old->user_email);
-        if ($pending && $user->user_email !== '' && $pending['newemail'] === $user->user_email) {
-            update_user_meta($userId, self::VERIFIED, self::fingerprint($user->user_email));
-        }
+        // confirm() records the fingerprint only after the native write succeeds.
     }
 
     public static function optionalEmail(array $fields): array
@@ -244,8 +291,9 @@ final class EmailRecovery
         add_filter('allow_password_reset', [self::class, 'allow'], PHP_INT_MAX, 2);
         add_filter('wp_pre_insert_user_data', [self::class, 'guardEmail'], PHP_INT_MAX, 4);
         add_action('profile_update', [self::class, 'profileUpdated'], 10, 2);
-        add_action('admin_init', [self::class, 'rejectInvalidConfirmation'], 0);
-        add_filter('woocommerce_prevent_admin_access', [self::class, 'allowNativeConfirmation'], PHP_INT_MAX);
+        add_action('admin_init',[self::class,'handleConfirmation'],0);
+        add_filter('add_user_metadata',[self::class,'guardNativePending'],PHP_INT_MAX,3);
+        add_filter('update_user_metadata',[self::class,'guardNativePending'],PHP_INT_MAX,3);
         add_filter('woocommerce_save_account_details_required_fields', [self::class, 'optionalEmail']);
         add_action('woocommerce_save_account_details_errors', [self::class, 'validateCommerceProfile'], 10, 2);
     }

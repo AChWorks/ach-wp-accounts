@@ -32,7 +32,7 @@ final class AccountFlow
         if (!preg_match('/\A[0-9a-f]{64}\z/D', $browser)) {
             throw new VerificationError('invalid_context');
         }
-        return hash_hmac('sha256', "ach-wpa-ticket\0$browser\0$payload", wp_salt('auth'));
+        return hash_hmac('sha256', "ach-wpa-ticket\0" . Lifecycle::epoch() . "\0$browser\0$payload", wp_salt('auth'));
     }
 
     private static function encode(array $data): string
@@ -133,9 +133,17 @@ final class AccountFlow
         if ($data['expires'] - time() < $this->verification->codeLifetime()) {
             throw new VerificationError('invalid_context');
         }
+        // Capture the validated target binding for privacy attribution. A later
+        // owner of the number must never inherit the previous binding's history.
+        $target = Identity::byMobile($data['mobile']);
+        if (!hash_equals($data['target'], self::snapshot($target, $data['id'], 'target'))) {
+            throw new VerificationError('identity_changed');
+        }
+        $revision = $target && (int)$target->user_id > 0 &&
+            ($data['purpose'] !== 'link' || (int)$target->user_id === get_current_user_id()) ? $target->revision : '';
         return $this->verification->issue(
             $data['id'], $data['mobile'], $data['purpose'],
-            self::challengeFlow($ticket, $browser), $network, $sender
+            self::challengeFlow($ticket, $browser), $network, $sender, $revision
         );
     }
 

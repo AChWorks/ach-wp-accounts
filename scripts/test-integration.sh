@@ -81,12 +81,20 @@ PHP
 
 "$php_bin" "$repo/tests/providers.php"
 "$php_bin" "$repo/tests/abilities.php"
+"$php_bin" "$repo/tests/standalone.php"
 "$php_bin" "$repo/tests/woocommerce.php"
 "$php_bin" "$repo/tests/accounts.php"
 "$php_bin" "$repo/tests/checkout.php"
+"$php_bin" "$repo/tests/purchase.php"
 "$php_bin" "$repo/tests/frontend.php"
 "$php_bin" "$repo/tests/operations.php"
 "$php_bin" "$repo/tests/admin.php"
+"$php_bin" "$repo/tests/lifecycle.php"
+# Optional pinned, locally provided WP-CLI distribution. No CI download or
+# runtime dependency. The commands use only this private fixture.
+if [[ -n "${WP_CLI_PHAR:-}" ]]; then
+    "$php_bin" "$repo/tests/cli.php"
+fi
 # Simulate a reviewed stable release without tagging or publishing.
 release_source="$lab/release-source"
 mkdir "$release_source"
@@ -133,3 +141,4 @@ assert manifest["requires_php"] == "8.1", "Approved minimum PHP version changed"
 print("PASS: deterministic runtime-only release ZIP, exact expected files and manifest")
 PYTEST
 "$php_bin" "$repo/tests/updater.php"
+"$php_bin" "$repo/tests/purge.php"

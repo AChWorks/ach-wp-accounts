@@ -19,6 +19,9 @@ msgstr "پذیرفته‌شده توسط ارائه‌دهنده"
 msgid "Account access"
 msgstr "دسترسی به حساب کاربری"
 
+msgid "Account data is temporarily unavailable."
+msgstr "اطلاعات حساب موقتاً در دسترس نیست."
+
 msgid "Account operations"
 msgstr "عملیات حساب"
 
@@ -48,6 +51,9 @@ msgstr "این سقف‌ها را متناسب با ترافیک سایت و ظ�
 
 msgid "Advanced traffic and verification limits"
 msgstr "محدودیت‌های پیشرفته ارسال و تأیید"
+
+msgid "After reviewing native account side effects, confirm the exact matching reservation and user. Never creates another account."
+msgstr "پس از بررسی آثار عملیات بومی حساب، رزرو و کاربر دقیقاً منطبق را تأیید کنید. حساب دیگری ایجاد نمی‌کند."
 
 msgid "All"
 msgstr "همه"
@@ -85,6 +91,9 @@ msgstr "این تغییر فقط بر تاریخچه عیب‌یابی اثر د
 msgid "Check HTTPS origin, database schema and scheduled cleanup before enabling mobile sign-in."
 msgstr "پیش از فعال‌سازی ورود با موبایل، آدرس HTTPS، ساختار پایگاه داده و پاک‌سازی زمان‌بندی‌شده را بررسی کنید."
 
+msgid "Check an explicitly reviewed historical verification manifest, including source conflicts. Does not infer verification from phone metadata."
+msgstr "فهرست سوابق تأیید بررسی‌شده را همراه با تعارض‌های منبع بررسی کنید. تأیید شماره از روی فراداده شماره تلفن استنباط نمی‌شود."
+
 msgid "Check provider access without sending a message."
 msgstr "بررسی دسترسی به ارائه‌دهنده بدون ارسال پیامک."
 
@@ -108,6 +117,9 @@ msgstr "پیکربندی ارائه‌دهنده"
 
 msgid "Confirm new password"
 msgstr "تکرار رمز عبور جدید"
+
+msgid "Confirm release of an exact reservation only when native account creation never started. Ambiguous native outcomes remain reserved."
+msgstr "آزادسازی رزرو مشخص را فقط زمانی تأیید کنید که ایجاد حساب بومی هرگز شروع نشده باشد. رزروهای دارای نتیجه نامشخص حفظ می‌شوند."
 
 msgid "Confirm removal of this provider configuration"
 msgstr "حذف تنظیمات این ارائه‌دهنده را تأیید می‌کنم."
@@ -205,6 +217,9 @@ msgstr "شماره موبایل خود را وارد کنید."
 msgid "Expired"
 msgstr "منقضی‌شده"
 
+msgid "Expiry (UTC)"
+msgstr "انقضا (UTC)"
+
 msgid "Explicitly send one potentially billable test message with the saved template. Requires confirmation and a unique request ID; exact replay is safe for the 24-hour challenge retention. The test cannot authenticate a customer."
 msgstr "ارسال صریح یک پیامک آزمایشی با الگوی ذخیره‌شده که ممکن است هزینه داشته باشد. نیازمند تأیید و شناسه یکتای درخواست است. تکرار همان درخواست در بازه نگهداری ۲۴ساعته، پیامک دیگری ارسال نمی‌کند. این آزمایش امکان ورود مشتری را فراهم نمی‌کند."
 
@@ -232,11 +247,20 @@ msgstr "تاریخچه در دسترس نیست"
 msgid "I confirm sending one potentially billable test message."
 msgstr "ارسال یک پیامک آزمایشی را که ممکن است هزینه داشته باشد تأیید می‌کنم."
 
+msgid "Import only verified, uncontested existing-account mappings from the exact approved manifest. Confirm first; resume with next offset. Does not create, merge or overwrite accounts."
+msgstr "فقط ارتباط‌های تأییدشده و بدون تعارض حساب‌های موجود را از فهرست دقیق تأییدشده وارد کنید. ابتدا تأیید کنید و سپس از موقعیت بعدی ادامه دهید. حسابی ایجاد، ادغام یا بازنویسی نمی‌شود."
+
+msgid "Import reviewed Digits identities"
+msgstr "انتقال هویت‌های بررسی‌شده Digits"
+
 msgid "Include {code} in the message. It is replaced with the verification code."
 msgstr "از {code} در متن پیام استفاده کنید تا با کد تأیید جایگزین شود."
 
 msgid "Inspect installed schema version and available provider capabilities. Does not send messages or access credentials."
 msgstr "بررسی نسخه ساختار داده و قابلیت‌های ارائه‌دهندگان پیامک، بدون ارسال پیام یا دسترسی به اطلاعات محرمانه."
+
+msgid "Inspect interrupted registrations"
+msgstr "بررسی ثبت‌نام‌های نیمه‌تمام"
 
 msgid "Last connection test"
 msgstr "آخرین آزمایش اتصال"
@@ -265,6 +289,9 @@ msgstr "شماره موبایل"
 msgid "Mobile registration"
 msgstr "ثبت‌نام با موبایل"
 
+msgid "Mobile session verification"
+msgstr "تأیید موبایل نشست"
+
 msgid "Mobile sign-in"
 msgstr "ورود با موبایل"
 
@@ -280,8 +307,17 @@ msgstr "تأیید موبایل موقتاً در دسترس نیست."
 msgid "Mobile verification is temporarily unavailable. Please try again later or contact support."
 msgstr "تأیید موبایل موقتاً در دسترس نیست. بعداً دوباره تلاش کنید یا با پشتیبانی تماس بگیرید."
 
+msgid "Mobile verification requests"
+msgstr "درخواست‌های تأیید موبایل"
+
+msgid "Mobile-created account"
+msgstr "حساب ایجادشده با موبایل"
+
 msgid "Multisite account identity is not supported by this development version."
 msgstr "این نسخه توسعه از هویت حساب در وردپرس چندسایته پشتیبانی نمی‌کند."
+
+msgid "Native account recovery evidence was retained to preserve access."
+msgstr "اطلاعات لازم برای بازیابی بومی حساب جهت حفظ دسترسی نگه داشته شد."
 
 msgid "Native site registration"
 msgstr "ثبت‌نام بومی سایت"
@@ -349,6 +385,12 @@ msgstr "شناسه الگو"
 msgid "Pattern values in order"
 msgstr "مقادیر الگو به ترتیب"
 
+msgid "Pending email expiry (UTC)"
+msgstr "انقضای تأیید ایمیل در انتظار (UTC)"
+
+msgid "Pending recovery email"
+msgstr "ایمیل بازیابی در انتظار تأیید"
+
 msgid "Please check the mobile number and try again."
 msgstr "شماره موبایل را بررسی کنید و دوباره تلاش کنید."
 
@@ -363,6 +405,9 @@ msgstr "برای ادامه خرید، وارد حساب خود شوید و شم
 
 msgid "Please sign in using your existing account credentials."
 msgstr "لطفاً با اطلاعات ورود به حساب فعلی خود وارد شوید."
+
+msgid "Preview reviewed Digits identities"
+msgstr "پیش‌نمایش هویت‌های بررسی‌شده Digits"
 
 msgid "Provider"
 msgstr "ارائه‌دهنده"
@@ -394,14 +439,23 @@ msgstr "خواندن تنظیمات غیرمحرمانه و وضعیت ثبت ا
 msgid "Read paginated redacted message, connection and account-operation evidence; no OTPs, full mobile numbers or credentials."
 msgstr "خواندن صفحه‌بندی‌شده رویدادهای پیامک، اتصال و عملیات حساب، بدون کد تأیید، شماره کامل موبایل یا اطلاعات محرمانه."
 
+msgid "Read pending reservations and matching native account evidence. Does not retry account creation."
+msgstr "رزروهای در انتظار و شواهد حساب بومی منطبق را بخوانید. ایجاد حساب دوباره انجام نمی‌شود."
+
 msgid "Recipient"
 msgstr "گیرنده"
 
 msgid "Recipient mobile"
 msgstr "شماره موبایل گیرنده"
 
+msgid "Reconcile an interrupted registration"
+msgstr "تکمیل کنترل‌شده ثبت‌نام نیمه‌تمام"
+
 msgid "Recovery email"
 msgstr "ایمیل بازیابی"
+
+msgid "Release an unstarted registration"
+msgstr "آزادسازی رزرو ثبت‌نام شروع‌نشده"
 
 msgid "Reload saved settings"
 msgstr "بارگذاری تنظیمات ذخیره‌شده"
@@ -520,6 +574,12 @@ msgstr "ورود با ایمیل یا نام کاربری"
 msgid "Sign-in and registration"
 msgstr "ورود و ثبت‌نام"
 
+msgid "Some account data could not be erased. Review and retry the privacy request."
+msgstr "بخشی از اطلاعات حساب قابل پاک‌سازی نبود. درخواست حریم خصوصی را بررسی و دوباره اجرا کنید."
+
+msgid "Stored mobile session proofs"
+msgstr "تأییدهای ذخیره‌شده موبایل نشست‌ها"
+
 msgid "Template name"
 msgstr "نام الگو"
 
@@ -597,6 +657,9 @@ msgstr "عملیات درخواستی کامل نشد. کد خطا و فیلد �
 
 msgid "The update package is not a recognized release."
 msgstr "بسته به‌روزرسانی یک نسخه انتشار معتبر نیست."
+
+msgid "The verified mobile identity was retained because removing it could prevent account recovery. Arrange another native recovery method or delete the account explicitly."
+msgstr "هویت موبایل تأییدشده حفظ شد، زیرا حذف آن ممکن است مانع بازیابی حساب شود. روش بازیابی بومی دیگری فراهم کنید یا حساب را به‌صورت صریح حذف کنید."
 
 msgid "This email address is not available for this account."
 msgstr "این آدرس ایمیل برای این حساب قابل استفاده نیست."
@@ -688,8 +751,14 @@ msgstr "الگوی تأیید"
 msgid "Verification policy"
 msgstr "تنظیمات تأیید"
 
+msgid "Verification source"
+msgstr "منبع تأیید"
+
 msgid "Verification state:"
 msgstr "وضعیت تأیید:"
+
+msgid "Verification time (UTC)"
+msgstr "زمان تأیید (UTC)"
 
 msgid "Verified"
 msgstr "تأیید‌شده"
@@ -699,6 +768,9 @@ msgstr "عملیات حساب کاربری با موبایل تأییدشده."
 
 msgid "Verified mobile identity and native WordPress account integration."
 msgstr "هویت تأییدشده موبایل و یکپارچگی با حساب بومی وردپرس."
+
+msgid "Verified mobile number"
+msgstr "شماره موبایل تأییدشده"
 
 msgid "Verified. Continuing…"
 msgstr "تأیید شد. در حال ادامه…"
@@ -735,6 +807,9 @@ msgstr "برای فعال‌سازی الزام تأیید در خرید، وو�
 
 msgid "WordPress registration"
 msgstr "ثبت‌نام وردپرس"
+
+msgid "Yes"
+msgstr "بله"
 
 msgid "You are signed in."
 msgstr "شما وارد حساب خود شده‌اید."

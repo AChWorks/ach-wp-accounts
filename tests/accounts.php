@@ -325,30 +325,34 @@ ensureAccount(get_userdata($userId)->user_email==='' && get_user_meta($userId,'b
 
 clearLimits();
 $beforeMail=get_userdata($userId)->user_email;
+$confirmationToken='';
+$mailFixture=static function ($pre,$args) use (&$confirmationToken) {
+    if (preg_match('/ach_confirm_email=([a-f0-9]{64})/',$args['message'],$m)) {
+        $confirmationToken=$m[1];
+    }
+    return true;
+};
+add_filter('pre_wp_mail',$mailFixture,99,2);
 $request=\ACh\WPAccounts\EmailRecovery::request('confirmed@example.invalid');
 ensureAccount($request['outcome']==='confirmation_requested' && get_userdata($userId)->user_email===$beforeMail,'Recovery request changed native email before confirmation');
-$pending=get_user_meta($userId,'_new_email',true);
-ensureAccount(is_array($pending) && $pending['newemail']==='confirmed@example.invalid' && $pending['ach_expires']>time(),'Missing native email confirmation record');
-global $pagenow;
-$previousPage=$pagenow;
-$pagenow='profile.php';
-$_GET=['newuseremail'=>'wrong-fixture-link'];
-ensureAccount(\ACh\WPAccounts\EmailRecovery::allowNativeConfirmation(true)===true,'Invalid link opened native admin confirmation');
+$table=Schema::table('recovery_emails');
+$pending=$wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE user_id=%d",$userId));
+ensureAccount($pending && $pending->new_email==='confirmed@example.invalid' && (int)$pending->retire_at>time() &&
+    $confirmationToken!=='' && $pending->token_hash===hash('sha256',$confirmationToken) &&
+    !get_user_meta($userId,'_new_email',true),'Missing private email confirmation record or native pending state leaked');
+ensureAccount(update_user_meta($userId,'_new_email',['hash'=>'fixture','newemail'=>'bad@example.invalid'])===false,'Native pending email allowed for managed user');
+expectAccountError(fn()=> \ACh\WPAccounts\EmailRecovery::confirm(str_repeat('0',64)),'invalid_context');
 $changed=wp_update_user(['ID'=>$userId,'user_email'=>'confirmed@example.invalid']);
-ensureAccount(is_wp_error($changed) && get_userdata($userId)->user_email==='','Invalid native link allowed account email write');
-$expired=$pending;
-$expired['ach_expires']=time()-1;
-update_user_meta($userId,'_new_email',$expired);
-$_GET=['newuseremail'=>$pending['hash']];
-ensureAccount(\ACh\WPAccounts\EmailRecovery::allowNativeConfirmation(true)===true,'Expired link opened native admin confirmation');
-update_user_meta($userId,'_new_email',$pending);
-ensureAccount(\ACh\WPAccounts\EmailRecovery::allowNativeConfirmation(true)===false,'Valid native confirmation was blocked');
-$changed=wp_update_user(['ID'=>$userId,'user_email'=>'confirmed@example.invalid']);
-ensureAccount(!is_wp_error($changed) && get_userdata($userId)->user_email==='confirmed@example.invalid' &&
-    wp_is_password_reset_allowed_for_user($userId)===true,'Native confirmation failed to establish recovery authority');
-delete_user_meta($userId,'_new_email'); // native profile.php consumes it after wp_update_user.
-$_GET=[];
-$pagenow=$previousPage;
+ensureAccount(is_wp_error($changed) && get_userdata($userId)->user_email==='','Direct write bypassed email proof');
+$wpdb->update($table,['retire_at'=>time()-1],['user_id'=>$userId]);
+expectAccountError(fn()=> \ACh\WPAccounts\EmailRecovery::confirm($confirmationToken),'invalid_context');
+$wpdb->update($table,['retire_at'=>$pending->retire_at],['user_id'=>$userId]);
+\ACh\WPAccounts\EmailRecovery::confirm($confirmationToken);
+ensureAccount(get_userdata($userId)->user_email==='confirmed@example.invalid' &&
+    wp_is_password_reset_allowed_for_user($userId)===true,'Confirmation failed to establish native recovery authority');
+expectAccountError(fn()=> \ACh\WPAccounts\EmailRecovery::confirm($confirmationToken),'invalid_context');
+remove_filter('pre_wp_mail',$mailFixture,99);
+unset($confirmationToken);
 $changed=wp_update_user(['ID'=>$userId,'user_email'=>'changed@example.invalid']);
 ensureAccount(is_wp_error($changed) && get_userdata($userId)->user_email==='confirmed@example.invalid','Direct profile edit replaced confirmed recovery address');
 expectAccountError(fn()=> \ACh\WPAccounts\EmailRecovery::password('short','short'),'invalid_password');

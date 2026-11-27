@@ -5,6 +5,18 @@ defined('ABSPATH') || exit;
 
 final class AccountPolicy
 {
+    public static function accountOperator(): bool
+    {
+        return current_user_can('manage_options') && current_user_can('edit_users');
+    }
+
+    public static function requireAccountOperator(): void
+    {
+        if (!self::accountOperator()) {
+            throw new SettingsError('','forbidden');
+        }
+    }
+
     /** Deny unknown or elevated role/capability combinations by default. */
     public static function ordinary(\WP_User $user): bool
     {
@@ -128,6 +140,13 @@ final class Accounts
 {
     public static function register(string $mobile, string $context): object
     {
+        $mobile = Mobile::normalize($mobile);
+        return DatabaseLock::run('registration-'.$mobile,
+            static fn()=>self::registerLocked($mobile,$context),'registration_pending');
+    }
+
+    private static function registerLocked(string $mobile,string $context): object
+    {
         $role = AccountPolicy::registrationRole($context);
         $reservation = Identity::reserveRegistration($mobile);
         $login = $reservation->registration_login;
@@ -176,6 +195,7 @@ final class Accounts
         // Once the native call starts its hooks may create other durable state.
         // An uncertain outcome must retain the reservation, not create again.
         try {
+            Identity::markRegistrationStarted($reservation);
             $userId = wp_insert_user($data);
             if (is_wp_error($userId) || !is_int($userId)) {
                 throw new VerificationError('registration_pending');

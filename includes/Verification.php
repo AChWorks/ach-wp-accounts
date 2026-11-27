@@ -159,10 +159,13 @@ final class Verification
      * request subject to the same quotas. Network must be derived from trusted
      * server request context (not a caller-controlled forwarding header).
      */
-    public function issue(string $id, string $mobile, string $purpose, #[\SensitiveParameter] string $flow, string $network, SmsSender $sender): array
+    public function issue(string $id, string $mobile, string $purpose, #[\SensitiveParameter] string $flow, string $network, SmsSender $sender, string $identityRevision = ''): array
     {
         global $wpdb;
         $this->validateContext($id, $purpose, $flow, true);
+        if ($identityRevision !== '' && !preg_match('/\A[0-9a-f]{32}\z/D', $identityRevision)) {
+            throw new VerificationError('invalid_context');
+        }
         $test = str_starts_with($purpose, 'test_');
         $mobile = Mobile::normalize($mobile);
         $ip = inet_pton($network);
@@ -189,9 +192,9 @@ final class Verification
             // so identify ownership with the freshly generated reservation identifier.
             $reservation = bin2hex(random_bytes(16));
             $this->query($wpdb->prepare(
-                "INSERT INTO `$table` (id,reservation_id,mobile,purpose,flow_hash,code_hash,provider,send_state,max_attempts,created_at,expires_at,resend_at,retire_at)
-                 VALUES (%s,%s,%s,%s,%s,%s,%s,'pending',%d,%d,%d,%d,%d) ON DUPLICATE KEY UPDATE id=id",
-                $id, $reservation, $mobile, $purpose, $flowHash, $codeHash, $provider, $this->policy->maxAttempts, $now, $now + $this->policy->codeLifetime,
+                "INSERT INTO `$table` (id,reservation_id,mobile,identity_revision,purpose,flow_hash,code_hash,provider,send_state,max_attempts,created_at,expires_at,resend_at,retire_at)
+                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'pending',%d,%d,%d,%d,%d) ON DUPLICATE KEY UPDATE id=id",
+                $id, $reservation, $mobile, $test ? '' : $identityRevision, $purpose, $flowHash, $codeHash, $provider, $this->policy->maxAttempts, $now, $now + $this->policy->codeLifetime,
                 $now + $this->policy->cooldown,
                 $now + max(86400, $this->policy->codeLifetime + $this->policy->proofLifetime)
             ));

@@ -33,6 +33,7 @@ final class Abilities
         return [
             'schema_version' => (int) get_option('ach_wp_accounts_schema_version', 0),
             'expected_schema_version' => Schema::VERSION,
+            'schema_ready'=>Lifecycle::ready(),'schema_error'=>Lifecycle::error(),
             'providers' => ProviderRegistry::capabilities(),
             'authentication_available' => BrowserApi::enabled(),
             'checkout_policy_available' => function_exists('WC'),
@@ -134,12 +135,12 @@ final class Abilities
     }
 
     private static function registerOne(string $name, string $label, string $description, ?array $input,
-        array $output, callable $execute, bool $readonly, bool $idempotent): void
+        array $output, callable $execute, bool $readonly, bool $idempotent, ?callable $permission = null, bool $destructive = false): void
     {
         $args = [
             'label'=>$label, 'description'=>$description, 'category'=>'ach-wp-accounts',
             'output_schema'=>$output,
-            'permission_callback'=>static fn(): bool => current_user_can('manage_options'),
+            'permission_callback'=>$permission ?? static fn(): bool => current_user_can('manage_options'),
             'execute_callback'=>static function ($input = []) use ($execute) {
                 try {
                     return $execute((array)$input);
@@ -156,7 +157,7 @@ final class Abilities
                 }
             },
             'meta'=>['show_in_rest'=>true, 'public'=>true,
-                'annotations'=>['readonly'=>$readonly,'destructive'=>false,'idempotent'=>$idempotent]],
+                'annotations'=>['readonly'=>$readonly,'destructive'=>$destructive,'idempotent'=>$idempotent]],
         ];
         if ($input !== null) {
             $args['input_schema'] = $input;
@@ -169,6 +170,7 @@ final class Abilities
         $properties = [
             'schema_version' => self::integer(),
             'expected_schema_version' => self::integer(),
+            'schema_ready'=>['type'=>'boolean'],'schema_error'=>self::string(),
             'providers' => self::list(self::object([
                 'id'=>self::string(),
                 'modes'=>self::list(self::string()),
@@ -196,6 +198,47 @@ final class Abilities
             __('Update non-secret settings using the current settings revision. Credentials can only be entered through protected administration.', 'ach-wp-accounts'),
             self::object(['revision'=>self::string(), 'patch'=>self::object(self::settingsProperties(false))], ['revision','patch']),
             $settingsOutput, static fn($input)=>Settings::update((array)$input['patch'], $input['revision']), false, false);
+        $pendingItem = self::object([
+            'reservation_id'=>self::string(),'mobile_tail'=>self::string(),
+            'native_user_id'=>['type'=>['integer','null']],
+            'state'=>self::enum(['unstarted','native_account_missing','matching_native_account','native_account_conflict']),
+        ],['reservation_id','mobile_tail','native_user_id','state']);
+        self::registerOne('registration-pending',__('Inspect interrupted registrations','ach-wp-accounts'),
+            __('Read pending reservations and matching native account evidence. Does not retry account creation.','ach-wp-accounts'),
+            self::object(['cursor'=>self::string(),'limit'=>self::integer(1,100)]),
+            self::object(['items'=>self::list($pendingItem),'next_cursor'=>['type'=>['string','null']]],['items','next_cursor']),
+            static fn($input)=>RegistrationRecovery::inspect($input['cursor'] ?? '',$input['limit'] ?? 50),true,true,[AccountPolicy::class,'accountOperator']);
+        self::registerOne('registration-reconcile',__('Reconcile an interrupted registration','ach-wp-accounts'),
+            __('After reviewing native account side effects, confirm the exact matching reservation and user. Never creates another account.','ach-wp-accounts'),
+            self::object(['reservation_id'=>self::string(),'user_id'=>self::integer(1),'confirm'=>['type'=>'boolean']],['reservation_id','user_id','confirm']),
+            self::object(['user_id'=>self::integer(1),'mobile_tail'=>self::string(),'outcome'=>self::enum(['reconciled'])],['user_id','mobile_tail','outcome']),
+            static fn($input)=>RegistrationRecovery::reconcile($input['reservation_id'],$input['user_id'],$input['confirm']),false,false,[AccountPolicy::class,'accountOperator']);
+        self::registerOne('registration-release',__('Release an unstarted registration','ach-wp-accounts'),
+            __('Confirm release of an exact reservation only when native account creation never started. Ambiguous native outcomes remain reserved.','ach-wp-accounts'),
+            self::object(['reservation_id'=>self::string(),'confirm'=>['type'=>'boolean']],['reservation_id','confirm']),
+            self::object(['outcome'=>self::enum(['released'])],['outcome']),
+            static fn($input)=>RegistrationRecovery::release($input['reservation_id'],$input['confirm']),
+            false,false,[AccountPolicy::class,'accountOperator'],true);
+        $migrationInput = [
+            'evidence'=>self::string(),
+            'rows'=>self::list(self::object(['user_id'=>self::integer(1),'mobile'=>self::string(),
+                'verified'=>['type'=>'boolean'],'verified_at'=>self::integer()],['user_id','mobile','verified'])),
+            'offset'=>self::integer(),'limit'=>self::integer(1,100),
+        ];
+        $migrationOutput = self::object([
+            'digest'=>self::string(),'total'=>self::integer(),'next_offset'=>['type'=>['integer','null']],
+            'items'=>self::list(self::object(['index'=>self::integer(),'user_id'=>self::integer(1),'mobile_tail'=>self::string(),
+                'state'=>self::enum(['invalid_mobile','source_conflict','unverified','ineligible_account','already_bound','identity_conflict','ready','imported','write_unconfirmed'])],
+                ['index','user_id','mobile_tail','state'])),
+        ],['digest','total','next_offset','items']);
+        self::registerOne('migration-preview',__('Preview reviewed Digits identities','ach-wp-accounts'),
+            __('Check an explicitly reviewed historical verification manifest, including source conflicts. Does not infer verification from phone metadata.','ach-wp-accounts'),
+            self::object($migrationInput,['evidence','rows']),$migrationOutput,
+            static fn($input)=>Migration::run($input),true,true,[AccountPolicy::class,'accountOperator']);
+        self::registerOne('migration-execute',__('Import reviewed Digits identities','ach-wp-accounts'),
+            __('Import only verified, uncontested existing-account mappings from the exact approved manifest. Confirm first; resume with next offset. Does not create, merge or overwrite accounts.','ach-wp-accounts'),
+            self::object($migrationInput+['digest'=>self::string(),'confirm'=>['type'=>'boolean']],['evidence','rows','digest','confirm']),$migrationOutput,
+            static fn($input)=>Migration::run($input,true),false,true,[AccountPolicy::class,'accountOperator']);
         $provider = self::enum(array_column(ProviderRegistry::capabilities(), 'id'));
         self::registerOne('provider-connection', __('Test provider connection', 'ach-wp-accounts'),
             __('Test saved provider credentials without sending SMS; records a diagnostic result.', 'ach-wp-accounts'),
