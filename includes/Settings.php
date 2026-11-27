@@ -281,6 +281,7 @@ final class Settings
         // Read the exact stored option row rather than a stale object-cache
         // value. WordPress update_option has no expected-value precondition.
         $previous = $wpdb->suppress_errors(true);
+        $invalidate = false;
         try {
             $raw = $wpdb->get_var($wpdb->prepare("SELECT option_value FROM $wpdb->options WHERE option_name=%s", self::OPTION));
             if (!is_string($raw) || $wpdb->last_error !== '') {
@@ -288,6 +289,7 @@ final class Settings
             }
             $stored = maybe_unserialize($raw);
             if (!is_array($stored) || ($stored['revision'] ?? null) !== $revision) {
+                $invalidate = true;
                 throw new SettingsError('revision', 'settings_conflict');
             }
             $next = array_replace(self::defaults(), array_intersect_key($stored, self::defaults()));
@@ -351,6 +353,7 @@ final class Settings
                 }
             }
             $next['revision'] = bin2hex(random_bytes(16));
+            $invalidate = true;
             $changed = $wpdb->query($wpdb->prepare(
                 "UPDATE $wpdb->options SET option_value=%s WHERE option_name=%s AND BINARY option_value=BINARY %s",
                 maybe_serialize($next), self::OPTION, $raw
@@ -360,11 +363,13 @@ final class Settings
             }
         } finally {
             $wpdb->suppress_errors($previous);
+            if ($invalidate) {
+                // Even an uncertain DB result or CAS conflict may mean that
+                // another revision is now authoritative. Invalidate only
+                // the installed non-autoloaded option, not global caches.
+                wp_cache_delete(self::OPTION, 'options');
+            }
         }
-        // The option is installed non-autoloaded. Invalidate WP's native
-        // option caches after the guarded SQL update; no global cache flush.
-        wp_cache_delete(self::OPTION, 'options');
-        wp_cache_delete('notoptions', 'options');
         return self::publicProjection($next);
     }
 }

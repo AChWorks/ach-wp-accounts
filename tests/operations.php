@@ -162,10 +162,11 @@ opsError(fn()=>saveSettings(['providers'=>['kavenegar'=>null]],true),'provider_u
 $switch=saveSettings(['selected_provider'=>'melipayamak']);
 opsCheck(Settings::sender()->id()==='melipayamak' && $calls===0,'Provider switching unexpectedly contacted network');
 saveSettings(['selected_provider'=>'kavenegar']);
-raceSettings(Settings::read()['revision']);
-// CLI fixture has no persistent object cache; drop this request's cached
-// option to observe the exact revision written by a separate process.
-wp_cache_delete(Settings::OPTION,'options');
+$raceRevision=Settings::read()['revision'];
+raceSettings($raceRevision);
+// A stale save is rejected by the database even if this PHP process still
+// holds the prior native option cache. The conflict invalidates that cache.
+opsError(fn()=>Settings::update(['verification'=>['networkHourly'=>70]],$raceRevision),'settings_conflict');
 opsCheck(Settings::current()['providers']['kavenegar']['credentials']===$old &&
     Settings::policy()->networkHourly>=61 && Settings::policy()->networkHourly<=64,
     'Concurrent update lost saved credentials or accepted policy');
