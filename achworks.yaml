@@ -1,0 +1,16 @@
+schemaVersion: achworks.dev/v1alpha1
+kind: Product
+metadata:
+  name: ach-wp-accounts
+  title: ACh WP Accounts
+  description: Focused WordPress account, authentication and verified identity extension.
+spec:
+  type: wordpress-plugin
+  lifecycle: planned
+  system: ach-wp-accounts
+  ownership: AChWorks
+  documentation:
+    path: docs/PROJECT-SPEC.md
+  source:
+    repository: AChWorks/ach-wp-accounts
+    url: https://github.com/AChWorks/ach-wp-accounts
