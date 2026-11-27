@@ -110,7 +110,7 @@ final class Updater
         }
         foreach (['requires_wp','tested_wp'] as $field) {
             if (!is_string($manifest[$field] ?? null) ||
-                ($manifest[$field] !== '' && !preg_match('/\A[0-9]+(?:\.[0-9]+){1,2}\z/D',$manifest[$field]))) {
+                (($field==='requires_wp' || $manifest[$field] !== '') && !preg_match('/\A[0-9]+(?:\.[0-9]+){1,2}\z/D',$manifest[$field]))) {
                 return null;
             }
         }
@@ -202,7 +202,7 @@ final class Updater
             return new \WP_Error('ach_accounts_update_changed',__('The release changed since the update check. Check for updates again before installing.','ach-wp-accounts'));
         }
         if (version_compare(PHP_VERSION,$release['requires_php'],'<') ||
-            ($release['requires_wp'] !== '' && version_compare(get_bloginfo('version'),$release['requires_wp'],'<'))) {
+            version_compare(get_bloginfo('version'),$release['requires_wp'],'<')) {
             return new \WP_Error('ach_accounts_update_compatibility',__('This release requires a newer PHP or WordPress version.','ach-wp-accounts'));
         }
         require_once ABSPATH . 'wp-admin/includes/file.php';

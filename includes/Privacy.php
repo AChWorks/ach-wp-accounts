@@ -63,7 +63,7 @@ final class Privacy
                 $data[] = ['name'=>__('Stored mobile session proofs','ach-wp-accounts'),'value'=>(string)$sessions];
             }
         } finally { $wpdb->suppress_errors($old); }
-        if (EmailRecovery::managed($id)) {
+        if (EmailRecovery::registeredHere($id)) {
             $data[] = ['name'=>__('Mobile-created account','ach-wp-accounts'),'value'=>__('Yes','ach-wp-accounts')];
         }
         $items = $page===1 && $data ? [['group_id'=>'ach-wp-accounts','group_label'=>'ACh WP Accounts',

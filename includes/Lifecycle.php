@@ -200,7 +200,7 @@ final class Lifecycle
                         throw new SettingsError('purge','storage_unavailable');
                     }
                 }
-                foreach (['_ach_accounts_registration','_ach_accounts_verified_email'] as $key) {
+                foreach (['_ach_accounts_registration','_ach_accounts_verified_email',EmailRecovery::POLICY] as $key) {
                     delete_metadata('user',0,$key,'',true);
                     $left = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $wpdb->usermeta WHERE meta_key=%s",$key));
                     if ($wpdb->last_error!=='' || (int)$left!==0) {

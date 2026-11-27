@@ -144,6 +144,11 @@ final class Identity
                 $mobile, $userId, $revision, time()
             ));
         } else {
+            $previous = self::byUser($userId);
+            if (!$previous || $previous->revision!==$expectedRevision) {
+                throw new VerificationError('identity_conflict');
+            }
+            EmailRecovery::preserveImportedPolicy($userId,$previous);
             $changed = self::write($wpdb->prepare(
                 "UPDATE $table SET mobile=%s,revision=%s,verified_at=%d,source='otp',source_ref=''
                  WHERE user_id=%d AND revision=%s",
@@ -168,6 +173,7 @@ final class Identity
      */
     public static function confirmPossession(object $identity): void
     {
+        EmailRecovery::preserveImportedPolicy((int)$identity->user_id,$identity);
         if ((int)$identity->verified_at > 0) { return; }
         global $wpdb;
         $table = Schema::table('identities');

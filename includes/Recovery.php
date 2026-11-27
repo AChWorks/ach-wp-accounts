@@ -4,20 +4,50 @@ namespace ACh\WPAccounts;
 defined('ABSPATH') || exit;
 
 /**
- * Recovery credentials for phone-created accounts only. Native email accounts
+ * Recovery credentials for plugin-created and imported phone-only accounts. Native email accounts
  * keep their existing WordPress/WooCommerce registration and profile policy.
  * Never store an unconfirmed address in wp_users.user_email, even temporarily.
  */
 final class EmailRecovery
 {
     private const MARKER = '_ach_accounts_registration';
+    public const POLICY = '_ach_accounts_recovery_managed';
     private const VERIFIED = '_ach_accounts_verified_email';
     public const QUERY = 'ach_confirm_email';
     private static ?object $confirming = null;
 
-    public static function managed(int $userId): bool
+    /** Registration provenance is not the recovery-policy marker. */
+    public static function registeredHere(int $userId): bool
     {
         return $userId > 0 && (bool) get_user_meta($userId, self::MARKER, true);
+    }
+
+    public static function managed(int $userId): bool
+    {
+        if ($userId < 1) { return false; }
+        if (self::registeredHere($userId) || get_user_meta($userId,self::POLICY,true)==='1') {
+            return true;
+        }
+        // Partial imports remain protected and can be reconciled by replay.
+        // Do not change the recovery policy of existing email-bearing users.
+        $user = get_userdata($userId);
+        if (!$user || $user->user_email!=='' || !Lifecycle::ready()) { return false; }
+        return (Identity::byUser($userId)->source ?? '')==='digits';
+    }
+
+    /** Preserve policy independently of a later phone change or privacy unlink. */
+    public static function preserveImportedPolicy(int $userId, ?object $identity): void
+    {
+        if (!$identity || (int)$identity->user_id!==$userId || $identity->source!=='digits' ||
+            self::registeredHere($userId) || get_user_meta($userId,self::POLICY,true)==='1') {
+            return;
+        }
+        $user = get_userdata($userId);
+        if (!$user || $user->user_email!=='') { return; }
+        update_user_meta($userId,self::POLICY,'1');
+        if (get_user_meta($userId,self::POLICY,true)!=='1') {
+            throw new VerificationError('storage_unavailable');
+        }
     }
 
     private static function fingerprint(string $email): string
@@ -131,6 +161,7 @@ final class EmailRecovery
                 if ($owner && (int)$owner!==$id) {
                     throw new VerificationError('email_unavailable');
                 }
+                self::preserveImportedPolicy($id,$identity);
                 // Atomically consume BEFORE the native update. If the outcome
                 // is uncertain, a new deliberate enrollment is required.
                 if ($wpdb->query($wpdb->prepare("DELETE FROM $table WHERE user_id=%d AND token_hash=%s AND retire_at>%d",
@@ -204,16 +235,16 @@ final class EmailRecovery
         if (!$update) {
             return isset($userdata['meta_input'][self::MARKER]) && ($data['user_email'] ?? '') !== '' ? [] : $data;
         }
-        if (!$userId || !self::managed($userId)) {
-            return $data;
-        }
+        if (!$userId) { return $data; }
         $old = get_userdata($userId);
         $email = $data['user_email'] ?? '';
-        if (!$old) {
+        if (!$old || $email === $old->user_email || $email === '') { return $data; }
+        try {
+            if (!self::managed($userId)) { return $data; }
+        } catch (VerificationError $error) {
+            // Do not establish an unconfirmed recovery path while a relevant
+            // partial-import identity cannot be read.
             return [];
-        }
-        if ($email === $old->user_email || $email === '') {
-            return $data;
         }
         $pending = self::$confirming;
         $identity = $pending ? Identity::byUser($userId) : null;
@@ -225,7 +256,7 @@ final class EmailRecovery
     public static function profileUpdated(int $userId, \WP_User $old): void
     {
         $user = get_userdata($userId);
-        if (!$user || !self::managed($userId) || $old->user_email === $user->user_email) {
+        if (!$user || $old->user_email === $user->user_email || !self::managed($userId)) {
             return;
         }
         delete_user_meta($userId, self::VERIFIED);

@@ -4,6 +4,7 @@
  * Description: Verified mobile identity and native WordPress account integration.
  * Version: 0.1.0
  * Update URI: https://github.com/AChWorks/ach-wp-accounts
+ * Requires at least: 6.3
  * Requires PHP: 8.1
  * Author: ACh
  * Author URI: https://ach.li/
@@ -13,6 +14,13 @@
  */
 
 defined('ABSPATH') || exit;
+
+// Core's installer uses the native headers. An already-active plugin after
+// a manual downgrade must also stay inert before loading incompatible code.
+global $wp_version;
+if (PHP_VERSION_ID < 80100 || version_compare($wp_version,'6.3','<')) {
+    return;
+}
 
 require_once __DIR__ . '/includes/Schema.php';
 require_once __DIR__ . '/includes/Lifecycle.php';

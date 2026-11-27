@@ -121,15 +121,16 @@ final class BrowserApi
             throw new VerificationError('invalid_context');
         }
         $identity = Identity::byUser($id);
+        $managed = EmailRecovery::managed($id);
         return [
             'authenticated' => $id > 0,
             'qualified' => SessionProof::qualifies(),
             'recent_proof' => SessionProof::qualifies(SessionProof::LINK_FRESHNESS),
             'can_link' => $id > 0 && AccountPolicy::canLinkWithoutPassword($id, $identity),
             'registration_allowed' => $id === 0 && AccountPolicy::registrationAllowed($context),
-            'managed_account' => EmailRecovery::managed($id),
-            'recovery_email' => EmailRecovery::managed($id) ? (string) get_userdata($id)->user_email : '',
-            'native_username' => EmailRecovery::managed($id) ? (string) get_userdata($id)->user_login : '',
+            'managed_account' => $managed,
+            'recovery_email' => $managed ? (string) get_userdata($id)->user_email : '',
+            'native_username' => $managed ? (string) get_userdata($id)->user_login : '',
             'has_mobile' => $identity !== null,
             'masked_mobile' => $identity ? '+98 ' . substr($identity->mobile, 3, 3) . ' *** ' . substr($identity->mobile, -4) : '',
         ];

@@ -110,6 +110,15 @@ final class Migration
                     if ($state==='ready') { $state='write_unconfirmed'; }
                 }
             }
+            if ($apply && in_array($state,['imported','already_bound'],true)) {
+                try {
+                    EmailRecovery::preserveImportedPolicy($row['user_id'],Identity::byUser($row['user_id']));
+                } catch (VerificationError $error) {
+                    // Identity may already be durable. Replaying the exact
+                    // mapping reconciles the recovery policy without rewriting it.
+                    $state = 'write_unconfirmed';
+                }
+            }
             $results[] = ['index'=>$offset+$i,'user_id'=>$row['user_id'],
                 'mobile_tail'=>$row['mobile']!=='' ? substr($row['mobile'],-4) : '', 'state'=>$state];
         }

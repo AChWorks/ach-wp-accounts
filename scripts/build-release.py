@@ -36,7 +36,9 @@ def build(source, output, tested_wp, candidate=False):
     requires_php = header(text, "Requires PHP")
     if requires_php != "8.1":
         raise ValueError("The approved minimum PHP version is 8.1.")
-    requires_wp = header(text, "Requires at least", required=False)
+    requires_wp = header(text, "Requires at least")
+    if requires_wp != "6.3":
+        raise ValueError("The validated minimum WordPress version is 6.3.")
     if any(value and not re.fullmatch(r"[0-9]+(?:\.[0-9]+){1,2}", value) for value in
            (requires_php, requires_wp, tested_wp)):
         raise ValueError("Invalid compatibility version.")

@@ -17,14 +17,64 @@ final class AccountPolicy
         }
     }
 
-    /** Deny unknown or elevated role/capability combinations by default. */
+    /** Deny unknown roles, stored elevation and effective site-wide privilege. */
     public static function ordinary(\WP_User $user): bool
     {
         if (!$user->exists() || !$user->roles || array_diff($user->roles, ['subscriber', 'customer'])) {
             return false;
         }
-        $allowed = ['read', 'level_0', 'subscriber', 'customer'];
-        return !array_diff(array_keys(array_filter($user->allcaps)), $allowed);
+        $allowed = ['read', 'level_0', 'subscriber', 'customer', 'exist'];
+        if (array_diff(array_keys(array_filter($user->allcaps)), ['read','level_0','subscriber','customer'])) {
+            return false;
+        }
+
+        // WordPress has no exhaustive capability registry. Probe the actual
+        // site role catalog plus Core's sensitive site-wide administration
+        // capabilities even if an extension removed them from every role.
+        // Object-scoped customer operations (e.g. pay_for_order) are not
+        // administrative capabilities and must not be probed without context.
+        $known = array_fill_keys([
+            'manage_options','edit_users','create_users','promote_users','delete_users','remove_users','list_users',
+            'install_plugins','activate_plugins','update_plugins','delete_plugins','edit_plugins',
+            'install_themes','switch_themes','update_themes','delete_themes','edit_themes','edit_theme_options',
+            'update_core','edit_files','unfiltered_html','unfiltered_upload','import','export',
+            'edit_posts','publish_posts','edit_others_posts','delete_others_posts','manage_categories','moderate_comments',
+            'manage_woocommerce','view_woocommerce_reports',
+        ], true);
+        foreach (wp_roles()->roles as $role) {
+            foreach ($role['capabilities'] as $cap => $_grant) {
+                $known[$cap] = true;
+            }
+        }
+        foreach ($allowed as $cap) { unset($known[$cap]); }
+        unset($known['do_not_allow']);
+
+        // Observe effective grants produced during native has_cap checks,
+        // including dynamically introduced names absent from the role catalog.
+        // Do not modify the capabilities, invoke filters with invented context,
+        // cache a result across authorization contexts, or ban extensions.
+        $elevated = false;
+        $observe = static function (array $caps, array $required, array $args, \WP_User $subject) use ($user,$allowed,&$elevated): array {
+            if ($subject->ID === $user->ID &&
+                array_diff(array_keys(array_filter($caps)), [...$allowed,'do_not_allow'])) {
+                $elevated = true;
+            }
+            return $caps;
+        };
+        add_filter('user_has_cap',$observe,PHP_INT_MAX,4);
+        try {
+            $user->has_cap('read');
+            if ($elevated) { return false; }
+            foreach (array_keys($known) as $cap) {
+                if ($user->has_cap($cap) || $elevated) { return false; }
+            }
+            return true;
+        } catch (\Throwable $error) {
+            // A failed authorization check must not confer SMS-only access.
+            return false;
+        } finally {
+            remove_filter('user_has_cap',$observe,PHP_INT_MAX);
+        }
     }
 
     public static function registrationRole(string $context): string
