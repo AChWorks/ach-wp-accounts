@@ -85,3 +85,4 @@ PHP
 "$php_bin" "$repo/tests/accounts.php"
 "$php_bin" "$repo/tests/checkout.php"
 "$php_bin" "$repo/tests/frontend.php"
+"$php_bin" "$repo/tests/operations.php"

@@ -6,7 +6,7 @@ defined('ABSPATH') || exit;
 /** Explicit transport selection; the configured mode never falls back automatically. */
 abstract class HttpSmsSender implements SmsSender
 {
-    public function __construct(protected readonly array $credentials, protected readonly array $default, protected readonly array $purposes = [])
+    public function __construct(#[\SensitiveParameter] protected readonly array $credentials, protected readonly array $default, protected readonly array $purposes = [])
     {
     }
 
@@ -18,7 +18,7 @@ abstract class HttpSmsSender implements SmsSender
     protected function secret(string $key): string
     {
         $value = $this->credentials[$key] ?? '';
-        if (!is_string($value) || trim($value) === '' || preg_match('/[\x00-\x1f\x7f]/', $value)) {
+        if (!is_string($value) || trim($value) === '' || trim($value) !== $value || preg_match('/[\x00-\x1f\x7f]/', $value)) {
             throw new \InvalidArgumentException('Missing or invalid provider credential.');
         }
         return $value;
@@ -51,7 +51,7 @@ abstract class HttpSmsSender implements SmsSender
     }
 
     /** Return bounded structured data only; never propagate URLs or raw errors. */
-    protected function post(string $url, array $body): array|SendResult
+    protected function post(#[\SensitiveParameter] string $url, #[\SensitiveParameter] array $body): array|SendResult
     {
         try {
             $response = wp_remote_post($url, [
@@ -101,6 +101,23 @@ abstract class HttpSmsSender implements SmsSender
         }
     }
 
+    /** Validate all configured routes without network I/O or duplicating transport rules. */
+    final public function validate(): void
+    {
+        if (array_diff(array_keys($this->purposes), ['login', 'link', 'step_up'])) {
+            throw new \InvalidArgumentException('Invalid verification purpose.');
+        }
+        foreach ([$this->default, ...array_values($this->purposes)] as $config) {
+            if (!is_array($config)) {
+                throw new \InvalidArgumentException('Invalid message configuration.');
+            }
+            $this->request('09120000000', '000000', $config);
+        }
+    }
+
+    /** @return array{0:string,1:array} Pure provider request construction. */
+    abstract protected function request(string $mobile, string $code, array $config): array;
+
     abstract protected function dispatch(string $mobile, string $code, array $config): SendResult;
 }
 
@@ -127,7 +144,7 @@ final class KavenegarSender extends HttpSmsSender
         return new SendResult($definite ? 'failed' : 'uncertain', $status === null ? 'http_' . $http : 'api_' . $status);
     }
 
-    protected function dispatch(string $mobile, string $code, array $config): SendResult
+    protected function request(string $mobile, string $code, array $config): array
     {
         $mode = $config['mode'] ?? '';
         if ($mode === 'pattern') {
@@ -156,6 +173,12 @@ final class KavenegarSender extends HttpSmsSender
         } else {
             throw new \InvalidArgumentException('Unsupported sending mode.');
         }
+        return [$url, $body];
+    }
+
+    protected function dispatch(string $mobile, string $code, array $config): SendResult
+    {
+        [$url, $body] = $this->request($mobile, $code, $config);
         $response = $this->post($url, $body);
         if ($response instanceof SendResult) {
             return $response;
@@ -210,7 +233,7 @@ final class MelipayamakSender extends HttpSmsSender
         return ['username' => $this->secret('username'), 'password' => $this->secret('api_key')];
     }
 
-    protected function dispatch(string $mobile, string $code, array $config): SendResult
+    protected function request(string $mobile, string $code, array $config): array
     {
         $body = $this->auth() + ['to' => $mobile];
         $mode = $config['mode'] ?? '';
@@ -241,7 +264,14 @@ final class MelipayamakSender extends HttpSmsSender
         } else {
             throw new \InvalidArgumentException('Unsupported sending mode.');
         }
-        $response = $this->post('https://rest.payamak-panel.com/api/SendSMS/' . $endpoint, $body);
+        return ['https://rest.payamak-panel.com/api/SendSMS/' . $endpoint, $body];
+    }
+
+    protected function dispatch(string $mobile, string $code, array $config): SendResult
+    {
+        [$url, $body] = $this->request($mobile, $code, $config);
+        $mode = $config['mode'];
+        $response = $this->post($url, $body);
         if ($response instanceof SendResult) {
             return $response;
         }
@@ -287,12 +317,12 @@ final class ProviderRegistry
     public static function capabilities(): array
     {
         return [
-            ['id' => 'kavenegar', 'modes' => ['pattern', 'text'], 'pattern_parameters' => 'named'],
-            ['id' => 'melipayamak', 'modes' => ['pattern', 'text'], 'pattern_parameters' => 'ordered'],
+            ['id' => 'kavenegar', 'modes' => ['pattern', 'text'], 'pattern_parameters' => 'named', 'credential_fields' => ['api_key']],
+            ['id' => 'melipayamak', 'modes' => ['pattern', 'text'], 'pattern_parameters' => 'ordered', 'credential_fields' => ['username','api_key']],
         ];
     }
 
-    public static function create(string $id, array $credentials, array $default, array $purposes = []): HttpSmsSender
+    public static function create(string $id, #[\SensitiveParameter] array $credentials, array $default, array $purposes = []): HttpSmsSender
     {
         return match ($id) {
             'kavenegar' => new KavenegarSender($credentials, $default, $purposes),

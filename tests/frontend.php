@@ -10,13 +10,18 @@ require $root.'/wp-load.php';
 if (wp_get_environment_type()!=='local' || DB_NAME!=='accounts_fixture' || get_option('siteurl')!=='https://accounts.test' || !defined('WC_VERSION')) {
     throw new RuntimeException('Not isolated.');
 }
+function fixtureFlag(string $key, bool $value): void {
+    $s=\ACh\WPAccounts\Settings::current();
+    $s[$key]=$value;
+    update_option(\ACh\WPAccounts\Settings::OPTION,$s,false);
+}
 add_filter('pre_wp_mail','__return_true');
 add_filter('pre_http_request',static fn()=>new WP_Error('fixture_no_network'));
 function frontCheck(bool $value,string $message): void {
     if (!$value) { throw new RuntimeException($message); }
 }
-update_option('ach_wp_accounts_auth_enabled',true);
-update_option('ach_wp_accounts_checkout_required',true);
+fixtureFlag('auth_enabled',true);
+fixtureFlag('checkout_required',true);
 update_option('woocommerce_enable_myaccount_registration','yes');
 $account=wp_insert_post(['post_type'=>'page','post_status'=>'publish','post_title'=>'Fixture account','post_content'=>'[woocommerce_my_account]']);
 update_option('woocommerce_myaccount_page_id',$account);
@@ -76,13 +81,13 @@ frontCheck(is_string(Frontend::checkoutShortcode(false,'woocommerce_checkout',[]
 SessionProof::record($user,SessionProof::currentToken($user),$identity);
 frontCheck(Frontend::checkoutShortcode(false,'woocommerce_checkout',[],[])===false &&
     Frontend::checkoutBlock(null,['blockName'=>'woocommerce/checkout'])===null,'Qualified session did not restore native checkout renderer');
-update_option('ach_wp_accounts_checkout_required',false);
+fixtureFlag('checkout_required',false);
 wp_set_current_user(0);
 unset($_COOKIE[LOGGED_IN_COOKIE]);
 frontCheck(Frontend::checkoutShortcode(false,'woocommerce_checkout',[],[])===false,'Disabled policy changed checkout renderer');
-update_option('ach_wp_accounts_auth_enabled',false);
+fixtureFlag('auth_enabled',false);
 frontCheck(Frontend::shortcode([])==='','Disabled plugin still renders shortcode form');
-update_option('ach_wp_accounts_auth_enabled',true);
+fixtureFlag('auth_enabled',true);
 
 // Test compiled Persian catalog with native WordPress translation APIs.
 add_filter('locale',static fn()=> 'fa_IR');

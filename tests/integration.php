@@ -229,6 +229,28 @@ check((int) $wpdb->get_var($wpdb->prepare("SELECT attempts FROM $challengeTable 
 denied(fn () => $service->verify($id, 'login', $flow, $code), 'invalid_proof');
 echo "PASS: concurrent wrong-code attempt limit\n";
 
+// The verification budget is shared across different challenges for one
+// mobile, not reset by a successful new SMS issuance.
+resetFixture();
+$bounded = new Verification(new VerificationPolicy(cooldown: 1, verifyHourly: 2));
+$first = requestId();
+$file = "$dir/aggregate-first";
+$bounded->issue($first, '09123456789', 'login', $flow, '192.0.2.1', new FixtureSender($file));
+$actual = codeFrom($file);
+$wrong = $actual === '000000' ? '000001' : '000000';
+denied(fn()=> $bounded->verify($first,'login',$flow,$wrong),'invalid_proof');
+$cooldownKey = hash_hmac('sha256', "cooldown\0+989123456789", wp_salt('auth'));
+$wpdb->update(Schema::table('limits'), ['next_at'=>time()-1], ['bucket_key'=>$cooldownKey]);
+$second = requestId();
+$file = "$dir/aggregate-second";
+$bounded->issue($second,'09123456789','login',$flow,'192.0.2.1',new FixtureSender($file));
+$actual = codeFrom($file);
+$wrong = $actual === '000000' ? '000001' : '000000';
+denied(fn()=> $bounded->verify($second,'login',$flow,$wrong),'invalid_proof');
+denied(fn()=> $bounded->verify($second,'login',$flow,$actual),'rate_limited');
+echo "PASS: verification budget across renewed challenges\n";
+
+
 foreach (['failed','uncertain','exception'] as $state) {
     resetFixture();
     $id = requestId();

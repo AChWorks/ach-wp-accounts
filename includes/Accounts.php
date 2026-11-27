@@ -17,7 +17,7 @@ final class AccountPolicy
 
     public static function registrationRole(string $context): string
     {
-        if (is_multisite() || !BrowserApi::flag('ach_wp_accounts_allow_registration')) {
+        if (is_multisite() || !Settings::flag('allow_registration')) {
             throw new VerificationError('registration_disabled');
         }
         if ($context === 'wp' && get_option('users_can_register')) {

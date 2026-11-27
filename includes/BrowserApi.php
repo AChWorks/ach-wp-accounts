@@ -10,13 +10,8 @@ final class BrowserApi
 
     public static function enabled(): bool
     {
-        return !is_multisite() && self::flag('ach_wp_accounts_auth_enabled') &&
+        return !is_multisite() && Settings::flag('auth_enabled') &&
             (int) get_option('ach_wp_accounts_schema_version', 0) === Schema::VERSION;
-    }
-
-    public static function flag(string $option): bool
-    {
-        return in_array(get_option($option, false), [true, 1, '1'], true);
     }
 
     public static function hooks(): void
@@ -34,6 +29,12 @@ final class BrowserApi
         }
         $port = isset($parsed['port']) && (int)$parsed['port'] !== 443 ? ':' . (int)$parsed['port'] : '';
         return 'https://' . strtolower($parsed['host']) . $port;
+    }
+
+    public static function compatibleOrigin(): bool
+    {
+        $admin = self::origin(admin_url('admin-ajax.php', 'https'));
+        return $admin !== '' && hash_equals($admin, self::origin(home_url('/')));
     }
 
     /** Browser POST only. Never trust forwarded headers supplied by a client. */
@@ -91,15 +92,9 @@ final class BrowserApi
     /** Internal provider configuration, never included in a browser response. */
     public static function sender(): HttpSmsSender
     {
-        $config = get_option('ach_wp_accounts_provider', []);
-        if (!is_array($config) || !is_string($config['id'] ?? null) ||
-            !is_array($config['credentials'] ?? null) || !is_array($config['default'] ?? null) ||
-            !is_array($config['purposes'] ?? [])) {
-            throw new VerificationError('authentication_unavailable');
-        }
         try {
-            return ProviderRegistry::create($config['id'], $config['credentials'], $config['default'], $config['purposes'] ?? []);
-        } catch (\InvalidArgumentException $error) {
+            return Settings::sender();
+        } catch (SettingsError $error) {
             throw new VerificationError('authentication_unavailable');
         }
     }
@@ -157,7 +152,7 @@ final class BrowserApi
         try {
             self::authorizeRequest();
             $operation = self::input('operation', 32);
-            $flow = new AccountFlow();
+            $flow = new AccountFlow(new Verification(Settings::policy()));
             switch ($operation) {
                 case 'status':
                     $result = self::status(self::input('context', 32));
@@ -200,12 +195,14 @@ final class BrowserApi
             wp_send_json_success($result);
         } catch (VerificationError $error) {
             $code = $error->getMessage();
+            Diagnostics::accountFailure($code, $operation ?? '');
             [$status, $message] = self::error($code);
             wp_send_json_error(['code' => $code, 'message' => $message], $status);
         } catch (\InvalidArgumentException $error) {
             wp_send_json_error(['code' => 'invalid_input', 'message' => __('Please check the mobile number and try again.', 'ach-wp-accounts')], 400);
         } catch (\Throwable $error) {
             // No raw exception/credentials/OTP/ticket or HTTP payload in responses.
+            Diagnostics::accountFailure('authentication_unavailable', $operation ?? '');
             [$status, $message] = self::error('authentication_unavailable');
             wp_send_json_error(['code' => 'authentication_unavailable', 'message' => $message], $status);
         }

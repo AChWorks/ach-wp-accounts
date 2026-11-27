@@ -12,6 +12,11 @@ require $root.'/wp-load.php';
 if (wp_get_environment_type()!=='local' || DB_NAME!=='accounts_fixture' || get_option('siteurl')!=='https://accounts.test' || !defined('WC_VERSION')) {
     throw new RuntimeException('Not the isolated WooCommerce fixture.');
 }
+function fixtureFlag(string $key, bool $value): void {
+    $s=\ACh\WPAccounts\Settings::current();
+    $s[$key]=$value;
+    update_option(\ACh\WPAccounts\Settings::OPTION,$s,false);
+}
 add_filter('pre_wp_mail','__return_true');
 add_filter('pre_http_request',static fn()=>new WP_Error('fixture_no_network'));
 function assertCheckout(bool $ok,string $message):void {
@@ -46,7 +51,7 @@ function nativeBoundary(callable $fn, bool $blocked): void {
 
 assertCheckout(!BrowserApi::enabled(),'Authentication unexpectedly active by default');
 assertCheckout(!CheckoutGate::enabled() && !rejectsClassic(),'Checkout unexpectedly restricted by default');
-update_option('ach_wp_accounts_checkout_required',true);
+fixtureFlag('checkout_required',true);
 wp_set_current_user(0);
 assertCheckout(rejectsClassic(),'Guest classic checkout accepted');
 nativeBoundary(fn()=>do_action('woocommerce_checkout_order_processed',1,[],null),true);
@@ -138,7 +143,7 @@ $identity=Identity::byUser($id);
 SessionProof::record($id,$token,$identity);
 WP_Session_Tokens::get_instance($id)->destroy($token);
 assertCheckout(!SessionProof::qualifies() && rejectsClassic(),'Revoked session retained checkout access');
-update_option('ach_wp_accounts_checkout_required',false);
+fixtureFlag('checkout_required',false);
 assertCheckout(!rejectsClassic(),'Disabled policy continued to reject checkout');
 
 // Validate the request boundary independently of an HTTP server. Actual
@@ -149,7 +154,7 @@ $_SERVER['HTTP_X_ACH_ACCOUNTS']='1';
 $_SERVER['HTTP_ORIGIN']='https://accounts.test';
 try { BrowserApi::authorizeRequest(); throw new RuntimeException('Disabled endpoint accepted'); }
 catch (VerificationError $error) { assertCheckout($error->getMessage()==='authentication_unavailable','Unexpected disabled response'); }
-update_option('ach_wp_accounts_auth_enabled',true);
+fixtureFlag('auth_enabled',true);
 BrowserApi::authorizeRequest();
 foreach (['https://elsewhere.test','null','https://accounts.test.evil.test','http://accounts.test',''] as $origin) {
     $_SERVER['HTTP_ORIGIN']=$origin;
@@ -160,5 +165,5 @@ $_SERVER['HTTP_ORIGIN']='https://accounts.test';
 unset($_SERVER['HTTP_X_ACH_ACCOUNTS']);
 try { BrowserApi::authorizeRequest(); throw new RuntimeException('Simple form POST accepted'); }
 catch (VerificationError $error) { assertCheckout($error->getMessage()==='invalid_context','Unexpected simple form rejection'); }
-update_option('ach_wp_accounts_auth_enabled',false);
+fixtureFlag('auth_enabled',false);
 echo "PASS: native REST checkout refusal, classic validation/boundary, actual order-pay gateway refusal/allow, session revocation and same-origin request policy\n";

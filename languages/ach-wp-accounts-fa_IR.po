@@ -55,6 +55,9 @@ msgstr "کد ارسال‌شده به شماره موبایل خود را وار
 msgid "Enter your mobile number."
 msgstr "شماره موبایل خود را وارد کنید."
 
+msgid "Explicitly send one potentially billable test message with the saved template. Requires confirmation and a unique request ID; exact replay is safe for the 24-hour challenge retention. The test cannot authenticate a customer."
+msgstr "ارسال صریح یک پیامک آزمایشی با الگوی ذخیره‌شده که ممکن است هزینه داشته باشد. نیازمند تأیید و شناسه یکتای درخواست است. تکرار همان درخواست در بازه نگهداری ۲۴ساعته، پیامک دیگری ارسال نمی‌کند. این آزمایش امکان ورود مشتری را فراهم نمی‌کند."
+
 msgid "Get verification code"
 msgstr "دریافت کد تأیید"
 
@@ -100,6 +103,18 @@ msgstr "برای ادامه خرید، وارد حساب خود شوید و شم
 msgid "Please sign in using your existing account credentials."
 msgstr "لطفاً با اطلاعات ورود به حساب فعلی خود وارد شوید."
 
+msgid "Query account diagnostics"
+msgstr "بررسی رویدادهای عیب‌یابی حساب‌ها"
+
+msgid "Read account settings"
+msgstr "خواندن تنظیمات حساب‌ها"
+
+msgid "Read non-secret settings and credential presence. Never returns provider credentials."
+msgstr "خواندن تنظیمات غیرمحرمانه و وضعیت ثبت اطلاعات اتصال، بدون نمایش اطلاعات محرمانه ارائه‌دهنده."
+
+msgid "Read paginated redacted message, connection and account-operation evidence; no OTPs, full mobile numbers or credentials."
+msgstr "خواندن صفحه‌بندی‌شده رویدادهای پیامک، اتصال و عملیات حساب، بدون کد تأیید، شماره کامل موبایل یا اطلاعات محرمانه."
+
 msgid "Recovery email"
 msgstr "ایمیل بازیابی"
 
@@ -111,6 +126,9 @@ msgstr "ذخیره رمز عبور"
 
 msgid "Send a new code"
 msgstr "ارسال مجدد کد"
+
+msgid "Send a test SMS"
+msgstr "ارسال پیامک آزمایشی"
 
 msgid "Send confirmation link"
 msgstr "ارسال لینک تأیید"
@@ -126,6 +144,15 @@ msgstr "ورود یا ثبت‌نام با ایمیل"
 
 msgid "Sign in with email or username"
 msgstr "ورود با ایمیل یا نام کاربری"
+
+msgid "Test provider connection"
+msgstr "آزمایش اتصال به ارائه‌دهنده"
+
+msgid "Test saved provider credentials without sending SMS; records a diagnostic result."
+msgstr "آزمایش اطلاعات اتصال ذخیره‌شده، بدون ارسال پیامک، همراه با ثبت نتیجه عیب‌یابی."
+
+msgid "The account operation could not be completed."
+msgstr "عملیات حساب کامل نشد."
 
 msgid "The code could not be sent. Please try again."
 msgstr "ارسال کد انجام نشد. دوباره تلاش کنید."
@@ -148,6 +175,9 @@ msgstr "رمز عبور به‌روزرسانی نشد. بعداً دوباره 
 msgid "The request is invalid. Please start again."
 msgstr "درخواست نامعتبر است. دوباره شروع کنید."
 
+msgid "The requested account operation could not be completed. Check the error code and field."
+msgstr "عملیات درخواستی کامل نشد. کد خطا و فیلد مربوط را بررسی کنید."
+
 msgid "This email address is not available for this account."
 msgstr "این آدرس ایمیل برای این حساب قابل استفاده نیست."
 
@@ -168,6 +198,12 @@ msgstr "تعداد درخواست‌ها بیش از حد مجاز است. بع�
 
 msgid "Try again"
 msgstr "تلاش مجدد"
+
+msgid "Update account settings"
+msgstr "به‌روزرسانی تنظیمات حساب‌ها"
+
+msgid "Update non-secret settings using the current settings revision. Credentials can only be entered through protected administration."
+msgstr "به‌روزرسانی تنظیمات غیرمحرمانه با نسخه فعلی تنظیمات. اطلاعات محرمانه فقط از بخش مدیریت محافظت‌شده وارد می‌شود."
 
 msgid "Use at least 15 characters and enter the same password twice."
 msgstr "از حداقل ۱۵ نویسه استفاده کنید و رمز عبور را دو بار یکسان وارد کنید."

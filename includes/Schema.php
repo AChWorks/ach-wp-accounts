@@ -11,7 +11,7 @@ final class Schema
     public static function table(string $name): string
     {
         global $wpdb;
-        if (!in_array($name, ['identities', 'challenges', 'limits', 'session_proofs'], true)) {
+        if (!in_array($name, ['identities', 'challenges', 'limits', 'session_proofs', 'events'], true)) {
             throw new \InvalidArgumentException('Unknown accounts table.');
         }
         return $wpdb->prefix . 'ach_accounts_' . $name;
@@ -52,12 +52,14 @@ final class Schema
             max_attempts smallint(5) unsigned NOT NULL,
             created_at bigint(20) unsigned NOT NULL,
             expires_at bigint(20) unsigned NOT NULL,
+            resend_at bigint(20) unsigned NOT NULL DEFAULT 0,
             verified_at bigint(20) unsigned NOT NULL DEFAULT 0,
             proof_hash char(64) NOT NULL DEFAULT '',
             proof_expires_at bigint(20) unsigned NOT NULL DEFAULT 0,
             consumed_at bigint(20) unsigned NOT NULL DEFAULT 0,
             retire_at bigint(20) unsigned NOT NULL,
             PRIMARY KEY  (id),
+            KEY chronology (created_at,id),
             KEY retire_at (retire_at)
         ) ENGINE=InnoDB $collation;");
         dbDelta("CREATE TABLE $limits (
@@ -69,6 +71,23 @@ final class Schema
             KEY retire_at (retire_at)
         ) ENGINE=InnoDB $collation;");
 
+        $events = self::table('events');
+        dbDelta("CREATE TABLE $events (
+            id char(32) NOT NULL,
+            category varchar(24) NOT NULL,
+            purpose varchar(32) NOT NULL DEFAULT '',
+            provider varchar(32) NOT NULL DEFAULT '',
+            state varchar(16) NOT NULL,
+            event_code varchar(64) NOT NULL,
+            provider_reference varchar(128) NOT NULL DEFAULT '',
+            recipient_tail char(4) NOT NULL DEFAULT '',
+            duration_ms int(10) unsigned NOT NULL DEFAULT 0,
+            created_at bigint(20) unsigned NOT NULL,
+            retire_at bigint(20) unsigned NOT NULL,
+            PRIMARY KEY  (id),
+            KEY chronology (created_at,id),
+            KEY retire_at (retire_at)
+        ) ENGINE=InnoDB $collation;");
         $sessions = self::table('session_proofs');
         dbDelta("CREATE TABLE $sessions (
             token_hash char(64) NOT NULL,
@@ -82,7 +101,7 @@ final class Schema
         ) ENGINE=InnoDB $collation;");
 
         // dbDelta returning a description is not proof of successful DDL.
-        foreach ([$identities => ['PRIMARY' => 'mobile', 'user_id' => 'user_id'], $challenges => ['PRIMARY' => 'id'], $limits => ['PRIMARY' => 'bucket_key'], $sessions => ['PRIMARY' => 'token_hash']] as $table => $required) {
+        foreach ([$identities => ['PRIMARY' => 'mobile', 'user_id' => 'user_id'], $challenges => ['PRIMARY' => 'id'], $limits => ['PRIMARY' => 'bucket_key'], $sessions => ['PRIMARY' => 'token_hash'], $events => ['PRIMARY' => 'id']] as $table => $required) {
             $status = $wpdb->get_row($wpdb->prepare('SHOW TABLE STATUS WHERE Name = %s', $table));
             if (!$status || strcasecmp((string) $status->Engine, 'InnoDB') !== 0) {
                 throw new \RuntimeException('Required transactional accounts table unavailable.');
@@ -102,9 +121,16 @@ final class Schema
     {
         global $wpdb;
         $more = false;
-        foreach (['challenges', 'limits', 'session_proofs'] as $name) {
+        $now = time();
+        foreach (['challenges', 'limits', 'session_proofs', 'events'] as $name) {
             $table = self::table($name);
-            $deleted = $wpdb->query($wpdb->prepare("DELETE FROM `$table` WHERE retire_at <= %d ORDER BY retire_at LIMIT 1000", time()));
+            $where = 'retire_at <= %d';
+            $args = [$now];
+            if ($name === 'events') {
+                $where .= ' OR created_at <= %d';
+                $args[] = $now - Settings::retentionSeconds();
+            }
+            $deleted = $wpdb->query($wpdb->prepare("DELETE FROM $table WHERE $where ORDER BY retire_at LIMIT 1000", ...$args));
             $more = $more || $deleted === 1000;
         }
         if ($more && !wp_next_scheduled('ach_wp_accounts_cleanup_continue')) {

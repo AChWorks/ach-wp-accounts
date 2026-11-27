@@ -20,9 +20,10 @@ final class VerificationPolicy
         public readonly int $networkHourly = 60,
         public readonly int $siteHourly = 300,
         public readonly int $siteDaily = 2000,
+        public readonly int $verifyHourly = 25,
     ) {
         if ($codeLifetime < 1 || $proofLifetime < 1 || $maxAttempts < 1 || $maxAttempts > 65535 ||
-            $cooldown < 1 || min($mobileHourly, $networkHourly, $siteHourly, $siteDaily) < 1 ||
+            $verifyHourly < 1 || $verifyHourly > 100 || $cooldown < 1 || min($mobileHourly, $networkHourly, $siteHourly, $siteDaily) < 1 ||
             max($mobileHourly, $networkHourly, $siteHourly, $siteDaily) > 4294967295) {
             throw new \InvalidArgumentException('Invalid verification policy.');
         }
@@ -53,10 +54,10 @@ final class Verification
         return hash_hmac('sha256', $kind . "\0" . implode("\0", $parts), wp_salt('auth'));
     }
 
-    private function validateContext(string $id, string $purpose, #[\SensitiveParameter] string $flow): void
+    private function validateContext(string $id, string $purpose, #[\SensitiveParameter] string $flow, bool $allowTest = false): void
     {
         if (!preg_match('/\A[0-9a-f]{32}\z/D', $id) || !preg_match('/\A[0-9a-f]{64}\z/D', $flow) ||
-            !in_array($purpose, self::PURPOSES, true)) {
+            (!in_array($purpose, self::PURPOSES, true) && !($allowTest && in_array($purpose, ['test_login','test_link','test_step_up'], true)))) {
             throw new VerificationError('invalid_context');
         }
     }
@@ -119,7 +120,7 @@ final class Verification
             'state' => $row->send_state === 'pending' ? 'uncertain' : $row->send_state,
             'expires_at' => (int) $row->expires_at,
             'expires_in' => max(0, (int) $row->expires_at - time()),
-            'retry_after' => max(0, (int) $row->created_at + $this->policy->cooldown - time()),
+            'retry_after' => max(0, (int) $row->resend_at - time()),
         ];
     }
 
@@ -161,7 +162,8 @@ final class Verification
     public function issue(string $id, string $mobile, string $purpose, #[\SensitiveParameter] string $flow, string $network, SmsSender $sender): array
     {
         global $wpdb;
-        $this->validateContext($id, $purpose, $flow);
+        $this->validateContext($id, $purpose, $flow, true);
+        $test = str_starts_with($purpose, 'test_');
         $mobile = Mobile::normalize($mobile);
         $ip = inet_pton($network);
         $provider = $sender->id();
@@ -177,7 +179,7 @@ final class Verification
         $now = time();
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $flowHash = $this->digest('flow', $flow);
-        $codeHash = $this->digest('code', $id, $mobile, $purpose, $flow, $code);
+        $codeHash = $test ? '' : $this->digest('code', $id, $mobile, $purpose, $flow, $code);
         $connection = $this->connection();
 
         $this->query('START TRANSACTION');
@@ -187,9 +189,10 @@ final class Verification
             // so identify ownership with the freshly generated reservation identifier.
             $reservation = bin2hex(random_bytes(16));
             $this->query($wpdb->prepare(
-                "INSERT INTO `$table` (id,reservation_id,mobile,purpose,flow_hash,code_hash,provider,send_state,max_attempts,created_at,expires_at,retire_at)
-                 VALUES (%s,%s,%s,%s,%s,%s,%s,'pending',%d,%d,%d,%d) ON DUPLICATE KEY UPDATE id=id",
+                "INSERT INTO `$table` (id,reservation_id,mobile,purpose,flow_hash,code_hash,provider,send_state,max_attempts,created_at,expires_at,resend_at,retire_at)
+                 VALUES (%s,%s,%s,%s,%s,%s,%s,'pending',%d,%d,%d,%d,%d) ON DUPLICATE KEY UPDATE id=id",
                 $id, $reservation, $mobile, $purpose, $flowHash, $codeHash, $provider, $this->policy->maxAttempts, $now, $now + $this->policy->codeLifetime,
+                $now + $this->policy->cooldown,
                 $now + max(86400, $this->policy->codeLifetime + $this->policy->proofLifetime)
             ));
             $row = $this->challenge($id, true);
@@ -227,7 +230,7 @@ final class Verification
 
         $start = hrtime(true);
         try {
-            $result = $sender->send($mobile, $code, $purpose);
+            $result = $sender->send($mobile, $code, $test ? substr($purpose, 5) : $purpose);
         } catch (\Throwable $error) {
             // Exception text may include secrets; uncertainty is not a retry.
             $result = new SendResult('uncertain', 'transport_exception');
@@ -242,7 +245,31 @@ final class Verification
         if (!$row) {
             throw new VerificationError('storage_unavailable');
         }
+        Diagnostics::recordSend($row);
         return $this->publicState($row);
+    }
+
+    /**
+     * A new SMS must not reset the entire guessing budget. Preserve the
+     * default effective 5 sends x 5 attempts per mobile/hour independently
+     * of configurable provider traffic. Count only active matching challenges.
+     */
+    private function reserveVerificationAttempt(string $mobile, int $now): void
+    {
+        global $wpdb;
+        $table = Schema::table('limits');
+        $hour = intdiv($now, 3600) * 3600;
+        $key = $this->digest('verify-mobile-hour', $mobile, (string)$hour);
+        $this->query($wpdb->prepare(
+            "INSERT INTO $table (bucket_key,retire_at) VALUES (%s,%d) ON DUPLICATE KEY UPDATE bucket_key=bucket_key",
+            $key, $hour + 3600
+        ));
+        $changed = $this->query($wpdb->prepare(
+            "UPDATE $table SET hits=hits+1 WHERE bucket_key=%s AND hits<%d", $key, $this->policy->verifyHourly
+        ));
+        if ($changed !== 1) {
+            throw new VerificationError('rate_limited');
+        }
     }
 
     /** OTP is single-use; proof is a separate random single-use continuation. */
@@ -252,9 +279,12 @@ final class Verification
         $this->validateContext($id, $purpose, $flow);
         $row = $this->challenge($id);
         $now = time();
-        if (!$row || !$this->matches($row, $purpose, $flow)) {
+        if (!$row || !$this->matches($row, $purpose, $flow) || (int)$row->expires_at <= $now ||
+            (int)$row->verified_at !== 0 || (int)$row->attempts >= (int)$row->max_attempts ||
+            $row->code_hash === '' || !in_array($row->send_state, ['accepted','uncertain','pending'], true)) {
             throw new VerificationError('invalid_proof');
         }
+        $this->reserveVerificationAttempt($row->mobile, $now);
         $code = Mobile::asciiDigits($code);
         $correct = preg_match('/\A[0-9]{6}\z/D', $code) &&
             hash_equals($row->code_hash, $this->digest('code', $id, $row->mobile, $purpose, $flow, $code));

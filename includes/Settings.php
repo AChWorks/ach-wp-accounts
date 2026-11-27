@@ -1,0 +1,370 @@
+<?php
+namespace ACh\WPAccounts;
+
+defined('ABSPATH') || exit;
+
+/** Validation errors identify a field, never its confidential value. */
+final class SettingsError extends \RuntimeException
+{
+    public function __construct(public readonly string $field, string $code = 'invalid_settings')
+    {
+        parent::__construct($code);
+    }
+}
+
+/**
+ * A single site-owned, non-autoloaded option is the configuration snapshot.
+ * A versioned compare-and-swap protects simultaneous admin/Ability updates.
+ * No secrets are returned from the operator-facing read operation.
+ */
+final class Settings
+{
+    public const OPTION = 'ach_wp_accounts_settings';
+
+    public static function defaults(): array
+    {
+        return [
+            'revision' => 'initial',
+            'auth_enabled' => false,
+            'allow_registration' => false,
+            'checkout_required' => false,
+            'selected_provider' => '',
+            'providers' => [],
+            'verification' => [
+                'codeLifetime' => 300, 'cooldown' => 60,
+                'mobileHourly' => 5, 'networkHourly' => 60,
+                'siteHourly' => 300, 'siteDaily' => 2000, 'verifyHourly' => 25,
+            ],
+            'diagnostics_retention_hours' => 24,
+        ];
+    }
+
+    public static function install(): void
+    {
+        add_option(self::OPTION, self::defaults(), '', false);
+        if (!is_array(get_option(self::OPTION))) {
+            throw new \RuntimeException('Accounts settings storage unavailable.');
+        }
+    }
+
+    /** Internal configuration only, never an API output. */
+    public static function current(): array
+    {
+        $value = get_option(self::OPTION, self::defaults());
+        return is_array($value) ? array_replace(self::defaults(), $value) : self::defaults();
+    }
+
+    public static function flag(string $key): bool
+    {
+        return (self::current()[$key] ?? false) === true;
+    }
+
+    public static function policy(): VerificationPolicy
+    {
+        return new VerificationPolicy(...self::validatePolicy(self::current()['verification']));
+    }
+
+    public static function retentionSeconds(): int
+    {
+        $hours = self::current()['diagnostics_retention_hours'];
+        // Corrupted settings must not prevent expiry cleanup.
+        return is_int($hours) && $hours >= 1 && $hours <= 168 ? $hours * HOUR_IN_SECONDS : DAY_IN_SECONDS;
+    }
+
+    private static function ids(): array
+    {
+        return array_column(ProviderRegistry::capabilities(), 'id');
+    }
+
+    public static function sender(?string $id = null): HttpSmsSender
+    {
+        $settings = self::current();
+        $id ??= $settings['selected_provider'];
+        if (!is_string($id) || !in_array($id, self::ids(), true)) {
+            throw new SettingsError('selected_provider', 'provider_unconfigured');
+        }
+        $config = $settings['providers'][$id] ?? null;
+        if (!is_array($config)) {
+            throw new SettingsError('selected_provider', 'provider_unconfigured');
+        }
+        try {
+            $sender = ProviderRegistry::create($id, $config['credentials'], $config['default'], $config['purposes']);
+            $sender->validate();
+            return $sender;
+        } catch (\Throwable $error) {
+            throw new SettingsError('providers.' . $id, 'provider_invalid');
+        }
+    }
+
+    public static function requireOperator(): void
+    {
+        if (!current_user_can('manage_options')) {
+            throw new SettingsError('', 'forbidden');
+        }
+    }
+
+    /** Deliberately allowlist the entire public projection. No masked secret is a credential. */
+    public static function read(): array
+    {
+        self::requireOperator();
+        return self::publicProjection(self::current());
+    }
+
+    private static function publicProjection(array $s): array
+    {
+        $providers = [];
+        foreach (self::ids() as $id) {
+            $config = $s['providers'][$id] ?? null;
+            if (!is_array($config)) {
+                continue;
+            }
+            try {
+                $default = self::route($id, $config['default'] ?? null, 'providers.' . $id . '.default');
+                $purposes = $config['purposes'] ?? [];
+                if (!is_array($purposes)) {
+                    throw new SettingsError('providers.' . $id . '.purposes');
+                }
+                self::keys($purposes, ['login','link','step_up'], 'providers.' . $id . '.purposes');
+                foreach ($purposes as $purpose => $route) {
+                    $purposes[$purpose] = self::route($id, $route, 'providers.' . $id . '.purposes.' . $purpose);
+                }
+            } catch (SettingsError $error) {
+                // The status operation can report invalid configuration.
+                // Never echo an unknown stored object or credential field.
+                continue;
+            }
+            $providers[$id] = [
+                'credentials_set' => array_values(array_filter(self::credentialKeys($id),
+                    static fn ($key) => is_string($config['credentials'][$key] ?? null) && $config['credentials'][$key] !== '')),
+                'default' => $default,
+                'purposes' => (object)$purposes,
+            ];
+        }
+        return [
+            'revision' => $s['revision'],
+            'auth_enabled' => $s['auth_enabled'] === true,
+            'allow_registration' => $s['allow_registration'] === true,
+            'checkout_required' => $s['checkout_required'] === true,
+            'selected_provider' => $s['selected_provider'],
+            'providers' => (object)$providers,
+            'verification' => $s['verification'],
+            'diagnostics_retention_hours' => $s['diagnostics_retention_hours'],
+        ];
+    }
+
+    private static function credentialKeys(string $id): array
+    {
+        foreach (ProviderRegistry::capabilities() as $provider) {
+            if ($provider['id'] === $id) {
+                return $provider['credential_fields'];
+            }
+        }
+        return [];
+    }
+
+    private static function keys(array $data, array $allowed, string $field): void
+    {
+        if (array_diff(array_keys($data), $allowed)) {
+            throw new SettingsError($field);
+        }
+    }
+
+    private static function integer(mixed $value, int $min, int $max, string $field): int
+    {
+        if (!is_int($value) || $value < $min || $value > $max) {
+            throw new SettingsError($field);
+        }
+        return $value;
+    }
+
+    private static function validatePolicy(mixed $policy): array
+    {
+        if (!is_array($policy)) {
+            throw new SettingsError('verification');
+        }
+        $default = self::defaults()['verification'];
+        self::keys($policy, array_keys($default), 'verification');
+        $policy = array_replace($default, $policy);
+        // Six-digit OTP and five attempts remain security invariants. Ten
+        // minutes is the upper lifetime of an out-of-band OTP (NIST 800-63B).
+        $policy['codeLifetime'] = self::integer($policy['codeLifetime'], 1, 600, 'verification.codeLifetime');
+        $policy['cooldown'] = self::integer($policy['cooldown'], 1, 86400, 'verification.cooldown');
+        $policy['verifyHourly'] = self::integer($policy['verifyHourly'], 1, 100, 'verification.verifyHourly');
+        foreach (['mobileHourly', 'networkHourly', 'siteHourly', 'siteDaily'] as $key) {
+            $policy[$key] = self::integer($policy[$key], 1, 4294967295, 'verification.' . $key);
+        }
+        return $policy;
+    }
+
+    private static function route(string $id, mixed $route, string $field): array
+    {
+        if (!is_array($route)) {
+            throw new SettingsError($field);
+        }
+        $mode = $route['mode'] ?? '';
+        $allowed = $mode === 'text' ? ['mode','sender','message']
+            : ($mode === 'pattern' && $id === 'kavenegar' ? ['mode','template','tokens']
+                : ($mode === 'pattern' ? ['mode','body_id','values'] : []));
+        if (!$allowed) {
+            throw new SettingsError($field . '.mode');
+        }
+        self::keys($route, $allowed, $field);
+        foreach ($route as $key => $value) {
+            if ($key === 'body_id') {
+                if (!is_int($value) && !is_string($value)) {
+                    throw new SettingsError($field . '.' . $key);
+                }
+            } elseif (in_array($key, ['tokens','values'], true)) {
+                if (!is_array($value) || array_filter($value, static fn($item) => !is_string($item))) {
+                    throw new SettingsError($field . '.' . $key);
+                }
+            } elseif (!is_string($value)) {
+                throw new SettingsError($field . '.' . $key);
+            }
+        }
+        if ($mode === 'pattern' && $id === 'kavenegar') {
+            $route['tokens'] ??= [];
+            self::keys($route['tokens'], ['token2','token3','token10','token20'], $field . '.tokens');
+        }
+        return $route;
+    }
+
+    private static function config(string $id, #[\SensitiveParameter] array $old, #[\SensitiveParameter] mixed $patch, bool $writeCredentials): array
+    {
+        $field = 'providers.' . $id;
+        if (!is_array($patch)) {
+            throw new SettingsError($field);
+        }
+        self::keys($patch, ['credentials','default','purposes'], $field);
+        $credentials = $old['credentials'] ?? [];
+        if (array_key_exists('credentials', $patch)) {
+            if (!$writeCredentials || !is_array($patch['credentials'])) {
+                throw new SettingsError($field . '.credentials', 'credential_write_forbidden');
+            }
+            self::keys($patch['credentials'], self::credentialKeys($id), $field . '.credentials');
+            foreach ($patch['credentials'] as $key => $secret) {
+                if (!is_string($secret) || $secret === '' || trim($secret) !== $secret ||
+                    preg_match('/[\x00-\x1f\x7f]/', $secret)) {
+                    throw new SettingsError($field . '.credentials.' . $key);
+                }
+                $credentials[$key] = $secret;
+            }
+        }
+        $default = self::route($id, $patch['default'] ?? $old['default'] ?? null, $field . '.default');
+        $purposes = $patch['purposes'] ?? $old['purposes'] ?? [];
+        if (!is_array($purposes)) {
+            throw new SettingsError($field . '.purposes');
+        }
+        self::keys($purposes, ['login','link','step_up'], $field . '.purposes');
+        foreach ($purposes as $purpose => $route) {
+            $purposes[$purpose] = self::route($id, $route, $field . '.purposes.' . $purpose);
+        }
+        try {
+            ProviderRegistry::create($id, $credentials, $default, $purposes)->validate();
+        } catch (\InvalidArgumentException $error) {
+            throw new SettingsError($field, 'provider_invalid');
+        }
+        return ['credentials' => $credentials, 'default' => $default, 'purposes' => $purposes];
+    }
+
+    /**
+     * Only the future nonce-protected wp-admin adapter may opt into writes of
+     * credentials. Abilities always call the non-secret variant.
+     * Provider config is a complete saved route or omitted; no half-active config.
+     */
+    public static function update(#[\SensitiveParameter] array $patch, string $revision, bool $writeCredentials = false): array
+    {
+        self::requireOperator();
+        global $wpdb;
+        self::keys($patch, ['auth_enabled','allow_registration','checkout_required','selected_provider',
+            'providers','verification','diagnostics_retention_hours'], '');
+        // Read the exact stored option row rather than a stale object-cache
+        // value. WordPress update_option has no expected-value precondition.
+        $previous = $wpdb->suppress_errors(true);
+        try {
+            $raw = $wpdb->get_var($wpdb->prepare("SELECT option_value FROM $wpdb->options WHERE option_name=%s", self::OPTION));
+            if (!is_string($raw) || $wpdb->last_error !== '') {
+                throw new SettingsError('', 'storage_unavailable');
+            }
+            $stored = maybe_unserialize($raw);
+            if (!is_array($stored) || ($stored['revision'] ?? null) !== $revision) {
+                throw new SettingsError('revision', 'settings_conflict');
+            }
+            $next = array_replace(self::defaults(), array_intersect_key($stored, self::defaults()));
+            foreach (['auth_enabled','allow_registration','checkout_required'] as $key) {
+                if (array_key_exists($key, $patch)) {
+                    if (!is_bool($patch[$key])) {
+                        throw new SettingsError($key);
+                    }
+                    $next[$key] = $patch[$key];
+                }
+            }
+            if (array_key_exists('selected_provider', $patch)) {
+                if (!is_string($patch['selected_provider']) || !in_array($patch['selected_provider'], ['',...self::ids()], true)) {
+                    throw new SettingsError('selected_provider');
+                }
+                $next['selected_provider'] = $patch['selected_provider'];
+            }
+            if (array_key_exists('providers', $patch)) {
+                if (!is_array($patch['providers'])) {
+                    throw new SettingsError('providers');
+                }
+                self::keys($patch['providers'], self::ids(), 'providers');
+                foreach ($patch['providers'] as $id => $providerPatch) {
+                    if ($providerPatch === null) {
+                        if (!$writeCredentials) {
+                            throw new SettingsError('providers.' . $id, 'credential_write_forbidden');
+                        }
+                        unset($next['providers'][$id]);
+                    } else {
+                        $next['providers'][$id] = self::config($id, $next['providers'][$id] ?? [], $providerPatch, $writeCredentials);
+                    }
+                }
+            }
+            if (array_key_exists('verification', $patch)) {
+                if (!is_array($patch['verification'])) {
+                    throw new SettingsError('verification');
+                }
+                $next['verification'] = self::validatePolicy(array_replace($next['verification'], $patch['verification']));
+            }
+            if (array_key_exists('diagnostics_retention_hours', $patch)) {
+                $next['diagnostics_retention_hours'] = self::integer($patch['diagnostics_retention_hours'], 1, 168, 'diagnostics_retention_hours');
+            }
+            if ($next['checkout_required'] && !$next['auth_enabled']) {
+                throw new SettingsError('checkout_required', 'authentication_required');
+            }
+            if ($next['checkout_required'] && !function_exists('WC') && empty($stored['checkout_required'])) {
+                throw new SettingsError('checkout_required', 'woocommerce_unavailable');
+            }
+            if ($next['auth_enabled']) {
+                $id = $next['selected_provider'];
+                if (!isset($next['providers'][$id])) {
+                    throw new SettingsError('selected_provider', 'provider_unconfigured');
+                }
+                // Revalidate the selected saved config even when the patch
+                // only changes an enable flag. No network side effects.
+                $next['providers'][$id] = self::config($id, $next['providers'][$id], [], false);
+                // Check actual HTTPS origin compatibility, not connectivity.
+                if (!BrowserApi::compatibleOrigin() || is_multisite() ||
+                    (int)get_option('ach_wp_accounts_schema_version', 0) !== Schema::VERSION) {
+                    throw new SettingsError('auth_enabled', 'environment_unavailable');
+                }
+            }
+            $next['revision'] = bin2hex(random_bytes(16));
+            $changed = $wpdb->query($wpdb->prepare(
+                "UPDATE $wpdb->options SET option_value=%s WHERE option_name=%s AND BINARY option_value=BINARY %s",
+                maybe_serialize($next), self::OPTION, $raw
+            ));
+            if ($changed !== 1) {
+                throw new SettingsError('revision', $changed === false ? 'storage_unavailable' : 'settings_conflict');
+            }
+        } finally {
+            $wpdb->suppress_errors($previous);
+        }
+        // The option is installed non-autoloaded. Invalidate WP's native
+        // option caches after the guarded SQL update; no global cache flush.
+        wp_cache_delete(self::OPTION, 'options');
+        wp_cache_delete('notoptions', 'options');
+        return self::publicProjection($next);
+    }
+}

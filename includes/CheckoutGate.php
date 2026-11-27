@@ -10,7 +10,7 @@ final class CheckoutGate
 
     public static function enabled(): bool
     {
-        return BrowserApi::flag('ach_wp_accounts_checkout_required');
+        return Settings::flag('checkout_required');
     }
 
     public static function blocked(): bool

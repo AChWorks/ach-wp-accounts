@@ -18,6 +18,9 @@ require_once __DIR__ . '/includes/Mobile.php';
 require_once __DIR__ . '/includes/Messaging.php';
 require_once __DIR__ . '/includes/Providers.php';
 require_once __DIR__ . '/includes/Verification.php';
+require_once __DIR__ . '/includes/Settings.php';
+require_once __DIR__ . '/includes/Diagnostics.php';
+require_once __DIR__ . '/includes/Operations.php';
 require_once __DIR__ . '/includes/Identity.php';
 require_once __DIR__ . '/includes/SessionProof.php';
 require_once __DIR__ . '/includes/Accounts.php';
@@ -42,6 +45,7 @@ register_activation_hook(__FILE__, static function (bool $networkWide): void {
     }
     try {
         \ACh\WPAccounts\Schema::install();
+        \ACh\WPAccounts\Settings::install();
         if (!wp_next_scheduled('ach_wp_accounts_cleanup')) {
             $scheduled = wp_schedule_event(time() + HOUR_IN_SECONDS, 'hourly', 'ach_wp_accounts_cleanup', [], true);
             if ($scheduled !== true) {

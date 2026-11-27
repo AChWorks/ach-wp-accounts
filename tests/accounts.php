@@ -21,6 +21,11 @@ require_once ABSPATH . 'wp-admin/includes/user.php';
 if (wp_get_environment_type() !== 'local' || DB_NAME !== 'accounts_fixture' || get_option('siteurl') !== 'https://accounts.test' || !defined('WC_VERSION')) {
     throw new RuntimeException('Not the isolated WooCommerce fixture.');
 }
+function fixtureFlag(string $key, bool $value): void {
+    $s=\ACh\WPAccounts\Settings::current();
+    $s[$key]=$value;
+    update_option(\ACh\WPAccounts\Settings::OPTION,$s,false);
+}
 add_filter('pre_wp_mail', '__return_true');
 add_filter('pre_http_request', static fn () => new WP_Error('fixture_no_network'));
 
@@ -141,7 +146,7 @@ $sender=sendFlow($flow,$browser,$ticket);
 expectAccountError(fn()=> $flow->complete($browser,$ticket,$sender->code),'registration_disabled');
 ensureAccount(Identity::byMobile($mobile)===null,'Disabled registration created identity');
 
-update_option('ach_wp_accounts_allow_registration',true);
+fixtureFlag('allow_registration',true);
 update_option('woocommerce_enable_myaccount_registration','yes');
 clearLimits();
 $ticket=$flow->start($browser,$mobile,'login','account');
@@ -254,8 +259,8 @@ ensureAccount(Identity::byUser($userId)->mobile===$newMobile,'Conflict changed i
 
 // Native email registration is independent of the plugin's registration switch.
 guest();
-update_option('ach_wp_accounts_allow_registration',false);
-update_option('ach_wp_accounts_checkout_required',true);
+fixtureFlag('allow_registration',false);
+fixtureFlag('checkout_required',true);
 $before=(int)$wpdb->get_var("SELECT COUNT(*) FROM $wpdb->users");
 $emailId=wc_create_new_customer('fixture_email_signup@example.invalid','fixture_email_signup');
 ensureAccount(is_int($emailId),'Native email registration changed by mobile policy');
@@ -280,8 +285,8 @@ $ticket=$flow->start($browser,$emailMobile,'step_up','checkout');
 $sender=sendFlow($flow,$browser,$ticket);
 $flow->complete($browser,$ticket,$sender->code);
 ensureAccount(!\ACh\WPAccounts\CheckoutGate::blocked(),'Existing mobile step-up did not reopen checkout');
-update_option('ach_wp_accounts_checkout_required',false);
-update_option('ach_wp_accounts_allow_registration',true);
+fixtureFlag('checkout_required',false);
+fixtureFlag('allow_registration',true);
 
 $plainPassword=wp_generate_password(32);
 $legacyId=wp_insert_user(['user_login'=>'fixture_legacy_link','user_pass'=>$plainPassword,'user_email'=>'legacy@example.invalid','role'=>'customer']);
