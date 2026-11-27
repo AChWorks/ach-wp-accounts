@@ -30,20 +30,25 @@ final class CLI
                     AccountPolicy::requireAccountOperator();
                     // Private, operator-supplied local JSON manifest. No upload
                     // endpoint or server path accepted by remote Abilities.
-                    $path = $args[0] ?? '';
-                    if (!is_string($path) || !is_file($path) || !is_readable($path)) {
-                        throw new SettingsError('manifest');
+                    if (isset($assoc['source'])) {
+                        if ($args || $assoc['source']!=='digits') { throw new SettingsError('source','invalid_source'); }
+                        $manifest = ['source'=>'digits'];
+                    } else {
+                        $path = $args[0] ?? '';
+                        if (!is_string($path) || !is_file($path) || !is_readable($path)) {
+                            throw new SettingsError('manifest');
+                        }
+                        $manifest = json_decode((string)file_get_contents($path),true,512,JSON_THROW_ON_ERROR);
+                        if (!is_array($manifest) || array_key_exists('source',$manifest)) { throw new SettingsError('manifest'); }
                     }
-                    $manifest = json_decode((string)file_get_contents($path),true,512,JSON_THROW_ON_ERROR);
-                    if (!is_array($manifest)) { throw new SettingsError('manifest'); }
                     $manifest['offset'] = self::number($assoc['offset'] ?? '0',0);
                     $manifest['limit'] = self::number($assoc['limit'] ?? '50',1);
                     $manifest['digest'] = (string)($assoc['digest'] ?? '');
                     $manifest['confirm'] = ($assoc['confirm'] ?? '')==='import-reviewed-identities';
-                    return Migration::run($manifest,$apply);
+                    return isset($assoc['all']) ? self::migrationAll($manifest,$apply) : Migration::run($manifest,$apply);
                 });
             },['shortdesc'=>$apply ? 'Import the exact reviewed mapping page; fresh OTP verifies possession.' : 'Preview a private legacy mapping page.',
-                'synopsis'=>'<manifest> [--offset=<offset>] [--limit=<limit>]'.($apply ? ' --digest=<digest> --confirm=<confirmation>' : '')]);
+                'synopsis'=>'[<manifest>] [--source=<source>] [--all] [--offset=<offset>] [--limit=<limit>]'.($apply ? ' --digest=<digest> --confirm=<confirmation>' : '')]);
         }
         \WP_CLI::add_command('ach-accounts purge',static function ($args,$assoc) use ($file): void {
             self::handle(static function () use ($assoc,$file): array {
@@ -52,6 +57,35 @@ final class CLI
             });
         },['shortdesc'=>'Deactivate and deliberately purge only this plugin\'s data.',
             'synopsis'=>'--confirm=<confirmation>']);
+    }
+
+    /** Local bulk convenience: aggregate only, same digest, bounded write pages. */
+    private static function migrationAll(#[\SensitiveParameter] array $manifest,bool $apply): array
+    {
+        $counts = [];
+        $digest = null;
+        $pages = 0;
+        do {
+            $offset = $manifest['offset'];
+            $page = Migration::run($manifest,$apply);
+            if ($digest !== null && !hash_equals($digest,$page['digest'])) {
+                throw new SettingsError('digest','confirmation_required');
+            }
+            $digest = $page['digest'];
+            $pages++;
+            foreach ($page['items'] as $item) {
+                $counts[$item['state']] = ($counts[$item['state']] ?? 0)+1;
+            }
+            // Reconcile the exact page on an uncertain write rather than
+            // advancing a resume cursor past it.
+            $uncertain = $apply && in_array('write_unconfirmed',array_column($page['items'],'state'),true);
+            $manifest['offset'] = $uncertain ? $offset : $page['next_offset'];
+        } while ($manifest['offset'] !== null && !$uncertain);
+        unset($page['items']);
+        $page['counts'] = $counts;
+        $page['pages'] = $pages;
+        $page['next_offset'] = $manifest['offset'];
+        return $page;
     }
 
     private static function number(mixed $input,int $min): int

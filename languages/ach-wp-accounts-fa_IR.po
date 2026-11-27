@@ -91,8 +91,8 @@ msgstr "این تغییر فقط بر تاریخچه عیب‌یابی اثر د
 msgid "Check HTTPS origin, database schema and scheduled cleanup before enabling mobile sign-in."
 msgstr "پیش از فعال‌سازی ورود با موبایل، آدرس HTTPS، ساختار پایگاه داده و پاک‌سازی زمان‌بندی‌شده را بررسی کنید."
 
-msgid "Check selected legacy account mappings and all source conflicts. Historical OTP proof is not required; no possession is asserted."
-msgstr "نگاشت‌های انتخاب‌شده حساب‌های قدیمی و تمام تعارض‌های منبع را بررسی کنید. سابقه کد تأیید لازم نیست و مالکیت شماره تأیید نمی‌شود."
+msgid "Preview source=digits directly on the site, or supply a complete reviewed evidence/rows manifest. Check all source conflicts; no possession is asserted."
+msgstr "نگاشت‌های Digits را مستقیماً در سایت پیش‌نمایش کنید (source=digits) یا فهرست کامل بررسی‌شده را با evidence/rows ارسال کنید. همه تعارض‌های منبع بررسی می‌شوند؛ مالکیت شماره تأیید نمی‌شود."
 
 msgid "Check provider access without sending a message."
 msgstr "بررسی دسترسی به ارائه‌دهنده بدون ارسال پیامک."
@@ -247,8 +247,8 @@ msgstr "تاریخچه در دسترس نیست"
 msgid "I confirm sending one potentially billable test message."
 msgstr "ارسال یک پیامک آزمایشی را که ممکن است هزینه داشته باشد تأیید می‌کنم."
 
-msgid "Import selected, uncontested existing-account mappings from the exact approved manifest. Fresh OTP is required to verify possession. Confirm first; resume with next offset. Does not create, merge or overwrite accounts."
-msgstr "نگاشت‌های انتخاب‌شده و بدون تعارض حساب‌های موجود را از فهرست دقیق تأییدشده وارد کنید. تأیید مالکیت شماره به کد جدید نیاز دارد. ابتدا تأیید کنید و سپس از موقعیت بعدی ادامه دهید. حسابی ایجاد، ادغام یا بازنویسی نمی‌شود."
+msgid "Import uncontested existing-account mappings from the exact approved source or manifest digest. Fresh OTP verifies possession. Confirm first; resume with next offset. Does not create, merge or overwrite accounts."
+msgstr "نگاشت‌های بدون تعارض حساب‌های موجود را با شناسه دقیق تأییدشده منبع یا فهرست وارد کنید. مالکیت شماره با کد تأیید جدید احراز می‌شود. ابتدا تأیید کنید و سپس از موقعیت بعدی ادامه دهید. حسابی ایجاد، ادغام یا بازنویسی نمی‌شود."
 
 msgid "Import reviewed Digits identities"
 msgstr "انتقال هویت‌های بررسی‌شده Digits"

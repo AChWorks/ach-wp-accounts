@@ -224,24 +224,35 @@ final class Abilities
             static fn($input)=>RegistrationRecovery::release($input['reservation_id'],$input['confirm']),
             false,false,[AccountPolicy::class,'accountOperator'],true);
         $migrationInput = [
+            'source'=>self::enum(['digits']),
             'evidence'=>self::string(),
             'rows'=>self::list(self::object(['user_id'=>self::integer(1),'mobile'=>self::string(),
                 'selected'=>['type'=>'boolean']],['user_id','mobile','selected'])),
             'offset'=>self::integer(),'limit'=>self::integer(1,100),
         ];
+        $sourceCounts = array_fill_keys(['unexpected_key_rows','source_users','matching_primary_and_split',
+            'nonstandard_matching_split','incomplete_or_conflicting_source_users','marker_only_users','invalid_primary_rows',
+            'duplicate_primary_users','shared_numbers_among_resolved_candidates','historical_verification_assertions','draft_rows'],self::integer());
+        $sourceReport = [
+            'consistency'=>self::enum(['requires_quiescent_source']),
+            'source_rows'=>self::object(array_fill_keys(['digits_phone','digt_countrycode','digits_phone_no','digits_phone_verification_skipped'],self::integer()),
+                ['digits_phone','digt_countrycode','digits_phone_no','digits_phone_verification_skipped']),
+            'draft_available'=>['type'=>'boolean'],
+        ]+$sourceCounts;
         $migrationOutput = self::object([
+            'source_report'=>self::object($sourceReport,array_keys($sourceReport)),
             'digest'=>self::string(),'total'=>self::integer(),'next_offset'=>['type'=>['integer','null']],
             'items'=>self::list(self::object(['index'=>self::integer(),'user_id'=>self::integer(1),'mobile_tail'=>self::string(),
                 'state'=>self::enum(['invalid_mobile','source_conflict','excluded','ineligible_account','already_bound','identity_conflict','ready','imported','write_unconfirmed'])],
                 ['index','user_id','mobile_tail','state'])),
         ],['digest','total','next_offset','items']);
         self::registerOne('migration-preview',__('Preview reviewed Digits identities','ach-wp-accounts'),
-            __('Check selected legacy account mappings and all source conflicts. Historical OTP proof is not required; no possession is asserted.','ach-wp-accounts'),
-            self::object($migrationInput,['evidence','rows']),$migrationOutput,
+            __('Preview source=digits directly on the site, or supply a complete reviewed evidence/rows manifest. Check all source conflicts; no possession is asserted.','ach-wp-accounts'),
+            self::object($migrationInput),$migrationOutput,
             static fn($input)=>Migration::run($input),true,true,[AccountPolicy::class,'accountOperator']);
         self::registerOne('migration-execute',__('Import reviewed Digits identities','ach-wp-accounts'),
-            __('Import selected, uncontested existing-account mappings from the exact approved manifest. Fresh OTP is required to verify possession. Confirm first; resume with next offset. Does not create, merge or overwrite accounts.','ach-wp-accounts'),
-            self::object($migrationInput+['digest'=>self::string(),'confirm'=>['type'=>'boolean']],['evidence','rows','digest','confirm']),$migrationOutput,
+            __('Import uncontested existing-account mappings from the exact approved source or manifest digest. Fresh OTP verifies possession. Confirm first; resume with next offset. Does not create, merge or overwrite accounts.','ach-wp-accounts'),
+            self::object($migrationInput+['digest'=>self::string(),'confirm'=>['type'=>'boolean']],['digest','confirm']),$migrationOutput,
             static fn($input)=>Migration::run($input,true),false,true,[AccountPolicy::class,'accountOperator']);
         $provider = self::enum(array_column(ProviderRegistry::capabilities(), 'id'));
         self::registerOne('provider-connection', __('Test provider connection', 'ach-wp-accounts'),

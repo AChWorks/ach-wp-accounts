@@ -303,4 +303,10 @@ check(wp_next_scheduled('ach_wp_accounts_cleanup') === false, 'Cleanup left sche
 check((int) $wpdb->get_var("SELECT COUNT(*) FROM $identityTable") === 1, 'Deactivation destroyed identity data');
 $result = activate_plugin('ach-wp-accounts/ach-wp-accounts.php');
 check(!is_wp_error($result) && (int) $wpdb->get_var("SELECT COUNT(*) FROM $identityTable") === 1, 'Reactivation lost identity data');
+// The uniqueness race above uses deliberately synthetic IDs, not native
+// accounts. Release its exact fixture row after the lifecycle assertions so
+// a later restored-snapshot fixture cannot allocate the same ID and inherit
+// an unrelated artificial identity.
+check(!get_userdata($user) && $wpdb->delete($identityTable,['user_id'=>$user,'mobile'=>'+989123456789'],['%d','%s'])===1,
+    'Could not release isolated uniqueness fixture identity');
 echo "PASS: real unique constraints, cleanup, state-preserving activation lifecycle\n";

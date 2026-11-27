@@ -117,6 +117,17 @@ $change=fixtureMcpCall($session,'ach-wp-accounts/settings-update',6,[
 bridgeCheck((fixtureMcpData($change)['data']['diagnostics_retention_hours'] ?? 0)===72,'Authorized MCP settings update failed');
 $diagnostics=fixtureMcpCall($session,'ach-wp-accounts/diagnostics-query',7,['limit'=>5]);
 bridgeCheck((fixtureMcpData($diagnostics)['success'] ?? false)===true,'Authorized MCP diagnostics query failed');
+$direct=fixtureMcpCall($session,'ach-wp-accounts/migration-preview',8,['source'=>'digits','limit'=>1]);
+$directData=fixtureMcpData($direct);
+bridgeCheck(($directData['success']??false)===true && ($directData['data']['total']??0)===6 &&
+    ($directData['data']['source_report']['draft_available']??false)===true &&
+    !str_contains(wp_json_encode($direct),'+98912555'),'Authorized MCP direct source preview failed');
+$applied=fixtureMcpCall($session,'ach-wp-accounts/migration-execute',9,['source'=>'digits','limit'=>1,
+    'digest'=>$directData['data']['digest'],'confirm'=>true]);
+bridgeCheck((fixtureMcpData($applied)['success']??false)===true &&
+    (fixtureMcpData($applied)['data']['items'][0]['state']??'')===$directData['data']['items'][0]['state'],
+    'Authorized MCP direct source replay failed');
+
 wp_set_current_user($admin->ID);
 update_option(Settings::OPTION,$previous,false);
 $subscriber=get_user_by('login','fixture_subscriber');
@@ -124,5 +135,7 @@ bridgeCheck($subscriber instanceof WP_User,'Subscriber fixture missing');
 // Native authorization remains required even if an authenticated client has
 // a valid session; the Bridge may deny session initialization itself.
 wp_set_current_user($subscriber->ID);
-bridgeCheck(is_wp_error(wp_get_ability('ach-wp-accounts/status')->execute()),'Subscriber native permission bypassed');
+bridgeCheck(is_wp_error(wp_get_ability('ach-wp-accounts/status')->execute()) &&
+    is_wp_error(wp_get_ability('ach-wp-accounts/migration-preview')->execute(['source'=>'digits'])),
+    'Subscriber native permission bypassed');
 echo 'PASS: WP AI Bridge '.WP_AI_BRIDGE_VERSION." + MCP Adapter actual native catalog, OAuth MCP session, delegation denial, authorized status/settings projection, authorized update and diagnostics, stale write rejection and native permission\n";

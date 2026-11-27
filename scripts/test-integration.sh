@@ -136,6 +136,7 @@ if [[ -n "${BRIDGE_ARCHIVE:-}" || -n "${ADAPTER_ARCHIVE:-}" ]]; then
     "$php_bin" "$repo/tests/bridge.php" activate
     "$php_bin" "$repo/tests/bridge.php"
 fi
+"$php_bin" "$repo/tests/digits-scale.php"
 # Simulate a reviewed stable release without tagging or publishing.
 release_source="$lab/release-source"
 mkdir "$release_source"

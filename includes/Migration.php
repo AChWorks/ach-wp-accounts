@@ -16,11 +16,28 @@ final class Migration
         if (!Lifecycle::ready()) {
             throw new SettingsError('schema','storage_unavailable');
         }
-        if (array_diff(array_keys($input),['evidence','rows','offset','limit','digest','confirm'])) {
+        if (array_diff(array_keys($input),['source','evidence','rows','offset','limit','digest','confirm'])) {
             throw new SettingsError('manifest');
         }
-        $evidence = $input['evidence'] ?? '';
-        $rows = $input['rows'] ?? null;
+        $direct = array_key_exists('source',$input);
+        $report = null;
+        if ($direct) {
+            if ($input['source']!=='digits' || array_key_exists('evidence',$input) || array_key_exists('rows',$input)) {
+                throw new SettingsError('source','invalid_source');
+            }
+            $scan = DigitsSource::scan();
+            $report = $scan['report'];
+            if (!$report['draft_available']) {
+                // Do not silently omit ambiguous numbers or invent pairings.
+                // The preview exposes safe aggregate evidence but no executable digest.
+                return [[],[],[],'',$report];
+            }
+            $evidence = 'Direct Digits source mapping v1';
+            $rows = $scan['rows'];
+        } else {
+            $evidence = $input['evidence'] ?? '';
+            $rows = $input['rows'] ?? null;
+        }
         if (!is_string($evidence) || trim($evidence)==='' || !is_array($rows) || !array_is_list($rows) || !$rows) {
             throw new SettingsError('manifest');
         }
@@ -43,8 +60,8 @@ final class Migration
             $entries[] = $entry;
         }
         global $wpdb;
-        $digest = hash_hmac('sha256',json_encode(['digits',home_url('/'),DB_NAME,$wpdb->prefix,$evidence,$entries],JSON_THROW_ON_ERROR),wp_salt('auth'));
-        return [$entries,$phones,$users,$digest];
+        $digest = hash_hmac('sha256',json_encode(['digits',$direct?'site_source':'reviewed_manifest',home_url('/'),DB_NAME,$wpdb->prefix,$evidence,$entries],JSON_THROW_ON_ERROR),wp_salt('auth'));
+        return [$entries,$phones,$users,$digest,$report];
     }
 
     private static function classify(array $row,array $phones,array $users): string
@@ -68,7 +85,8 @@ final class Migration
     /** Reuse the same exact manifest and offset for every page/retry. */
     public static function run(#[\SensitiveParameter] array $input,bool $apply = false): array
     {
-        [$entries,$phones,$users,$digest] = self::manifest($input);
+        [$entries,$phones,$users,$digest,$report] = self::manifest($input);
+        if ($apply && $digest==='') { throw new SettingsError('source','source_not_ready'); }
         $offset = $input['offset'] ?? 0;
         $limit = $input['limit'] ?? 50;
         if (!is_int($offset) || !is_int($limit) || $offset<0 || $offset>count($entries) || $limit<1 || $limit>100) {
@@ -96,6 +114,8 @@ final class Migration
                 'mobile_tail'=>$row['mobile']!=='' ? substr($row['mobile'],-4) : '', 'state'=>$state];
         }
         $next = $offset+count($results);
-        return ['digest'=>$digest,'total'=>count($entries),'items'=>$results,'next_offset'=>$next<count($entries) ? $next : null];
+        $result = ['digest'=>$digest,'total'=>count($entries),'items'=>$results,'next_offset'=>$next<count($entries) ? $next : null];
+        if ($report !== null) { $result['source_report']=$report; }
+        return $result;
     }
 }
