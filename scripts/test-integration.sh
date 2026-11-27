@@ -120,6 +120,7 @@ fi
 "$php_bin" "$repo/tests/operations.php"
 "$php_bin" "$repo/tests/admin.php"
 "$php_bin" "$repo/tests/lifecycle.php"
+"$php_bin" "$repo/tests/digits-audit.php"
 # Optional pinned, locally provided WP-CLI distribution. No CI download or
 # runtime dependency. The commands use only this private fixture.
 if [[ -n "${WP_CLI_PHAR:-}" ]]; then
@@ -153,7 +154,8 @@ next_version = f"{major}.{minor}.{patch + 1}"
 p.write_text(s[:m.start()] + m.group(1) + next_version + s[m.end():])
 PYVERSION
 # Non-runtime files must never leak into the installable artifact.
-mkdir -p "$release_source/docs" "$release_source/tests" "$release_source/assets/dev"
+mkdir -p "$release_source/docs" "$release_source/tests" "$release_source/scripts" "$release_source/assets/dev"
+cp "$repo/scripts/audit-digits.php" "$release_source/scripts/"
 printf 'fixture only' > "$release_source/docs/internal.md"
 printf 'fixture only' > "$release_source/tests/example.php"
 printf 'fixture only' > "$release_source/assets/.env"

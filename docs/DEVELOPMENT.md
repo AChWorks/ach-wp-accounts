@@ -135,6 +135,22 @@ For a local private manifest file:
 
 The native Abilities expose the same service, without local path access. The isolated tests use a synthetic reviewed manifest; they do not establish actual Digits proof provenance or approve a target migration.
 
+### Local read-only Digits inventory
+
+For an isolated, access-controlled restored copy of the source site, install the candidate with authentication/signup/checkout policy disabled, select an authorized native administrator, and use the repository's development-only script:
+
+    wp --user=<administrator> eval-file /private/repo/scripts/audit-digits.php
+
+The report contains counts only: all three source fields and skip markers, duplicate/invalid/incomplete fields, shared numbers among resolved candidates, native account existence and effective eligibility, email presence, and matching nonstandard split boundaries. It does not read historical OTP/session/log payloads or infer verification. The source is expected to be quiescent; the multiple reads are not a transactionally consistent snapshot. WordPress bootstrap may execute installed extensions, so do not run this directly on a live site without the applicable separate authorization.
+
+When every source identity has exactly one primary mobile and one matching country-code/local pair, optionally create a private, new candidate manifest:
+
+    wp --user=<administrator> eval-file /private/repo/scripts/audit-digits.php /private/digits-candidates.json
+
+Choose an access-controlled directory outside the WordPress tree and repository. The script creates a new owner-only file, refuses overwrite and does not print the mapping. Every entry has verified=false, including shared numbers and accounts that are not eligible; they must remain in the reviewed mapping for conflict detection. Incomplete or ambiguous source groups withhold automatic draft creation rather than silently omit candidates or invent pairings. Resolve these against the intact source. Do not mark a row verified without independently established and explicitly approved historical proof; a draft is not a reviewed import manifest. Remove temporary private extracts after the approved work. This tool is excluded from the runtime ZIP, adds no runtime API or Digits dependency, and does not modify native accounts or source records.
+
+The fixture exercises this actual audit with matching/nonstandard splits, shared numbers, skipped markers, privileged and missing native accounts, empty emails, incomplete/duplicate fields, private file permissions and overwrite denial. It also rehearses all 38 pages of a synthetic 3,791-row reviewed manifest (100 rows per page), including an unverified conflicting candidate on the last page, eligible import, restart/replay, digest/provenance and unchanged native user count. The optional actual WP-CLI fixture exercises the report/private draft command and permission checks.
+
 ### Site-specific acceptance and cutover
 
 1. Inspect the exact installed Digits source/version, mapping keys, login methods, verification and phone-change paths. Only treat a historical event as proof if the source establishes successful mobile verification for the exact native user and current normalized number; a successful login, request count or phone metadata alone is insufficient. Check chronology, reassignment and invalidation. Unknown evidence remains unverified. Extract only the necessary columns (never OTP values, unrelated credentials or session data), use stable keyset pagination or an authorized consistent read-only export, and reconcile page coverage, source changes and counts. A live paginated read is not a transactional snapshot. Keep the private working evidence access-controlled and remove temporary extracts when no longer needed.
@@ -145,6 +161,8 @@ The native Abilities expose the same service, without local path access. The iso
 6. Recovery: rehearse the backup/restore on isolated staging before cutover, verify native alternative access (especially phone-only users), and agree on checkout continuity explicitly. If a problem occurs, stop the import, preserve evidence, reconcile in-flight work, and use an approved reversible configuration rollback or fallback; deactivation invalidates plugin proofs and removes its mandatory checkout enforcement, so it is not an automatic safe rollback. Do not purge or overwrite native records. Preserve legitimate new orders, balances, user changes and later identity revisions: a whole-site restore is only safe with controlled quiescence or a separately reconciled recovery plan. Any selective reversal of imported bindings requires explicit reviewed authorization, matching provenance and current revisions, and verified alternative access. Retain legacy data and backups until the owner approves cleanup.
 
 The runbook is a preparation contract, not proof that any site's actual mapping, recovery or deployment is approved.
+
+Blinko's actual read-only Digits source and aggregate mapping evidence is recorded in [Issue #1](https://github.com/AChWorks/ach-wp-accounts/issues/1#issuecomment-7226741994). All three legacy fields mapped consistently to 3,791 distinct native customer accounts in the complete live scans, including three nonstandard but matching split boundaries; 3,389 of these accounts have no native email. A successful legacy login or missing skip marker is not authoritative evidence of the current number's historical proof. Do not assume a working native password or email recovery path. Treat the preservation of existing phone-only customer access and the exact legacy-trust/recovery decision as a controlling site-specific cutover prerequisite, rather than silently promoting the inventory to verified bindings. Reconcile the actual dataset on an approved restored/quiescent copy and preserve the current checkout and payment behavior.
 
 ## Release packaging and native updates
 

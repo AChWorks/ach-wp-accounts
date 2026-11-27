@@ -34,5 +34,16 @@ try {
     $erase=cliRun(['ach-accounts','privacy-erase','--user-id='.$native->ID,'--confirm=erase-account-data']);
     cliCheck($erase['items_retained'],'CLI phone-only privacy safety failed');
     cliRun(['ach-accounts','purge','--confirm=wrong'],'fixture_admin',false);
+    $draftPath=$dir.'/digits-wp-cli-draft.json';
+    $script=dirname(__DIR__).'/scripts/audit-digits.php';
+    try {
+        cliRun(['eval-file',$script],$native->user_login,false);
+        $report=cliRun(['eval-file',$script,$draftPath]);
+        cliCheck($report['draft_written'] && $report['draft_rows']===5 && $report['historical_verification_assertions']===0,'WP-CLI Digits audit failed');
+        $draft=json_decode(file_get_contents($draftPath),true,512,JSON_THROW_ON_ERROR);
+        cliCheck(count($draft['rows'])===5 && !in_array(true,array_column($draft['rows'],'verified'),true),'WP-CLI draft asserted proof');
+        cliRun(['eval-file',$script,$draftPath],'fixture_admin',false);
+    } finally { if (is_file($draftPath)) { unlink($draftPath); } }
+
 } finally {unlink($file);}
-echo "PASS: actual WP-CLI preview/import, capability, privacy export/erase and explicit purge confirmation\n";
+echo "PASS: actual WP-CLI preview/import, capability, privacy export/erase, private Digits audit and explicit purge confirmation\n";
