@@ -135,6 +135,7 @@ final class Privacy
                 return self::result($removed,true,[__('The mobile identity was retained because removing it could prevent account recovery. Arrange another native recovery method or delete the account explicitly.','ach-wp-accounts')]);
             }
             if ($identity) {
+                EmailRecovery::preserveImportedPolicy($id,$identity);
                 self::removeIdentity($id,$identity);
                 $removed = true;
             }

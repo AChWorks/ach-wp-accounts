@@ -84,6 +84,11 @@ scaleCheck(($states['imported']??0)===$count && ($states['already_bound']??0)===
     ($states['identity_conflict']??0)===1 && array_sum($states)===$count+6 &&
     $matched===$count && (int)$wpdb->get_var("SELECT COUNT(*) FROM $wpdb->users")===$nativeTotal,
     'Direct site-scale import did not preserve native accounts, mapping or pending verification');
+$managed=(int)$wpdb->get_var($wpdb->prepare(
+    "SELECT COUNT(*) FROM $wpdb->usermeta m INNER JOIN $wpdb->users u ON u.ID=m.user_id
+     WHERE u.user_login LIKE %s AND m.meta_key=%s AND m.meta_value='1'",
+    $wpdb->esc_like($prefix).'%',\ACh\WPAccounts\EmailRecovery::POLICY));
+scaleCheck($managed===$count,'Full-scale phone-only recovery policy incomplete');
 $applySeconds=microtime(true)-$applyStarted;
 $first=Migration::run(['source'=>'digits','offset'=>0,'limit'=>100,'digest'=>$digest,'confirm'=>true],true);
 $last=Migration::run(['source'=>'digits','offset'=>3700,'limit'=>100,'digest'=>$digest,'confirm'=>true],true);

@@ -31,6 +31,8 @@ Lifecycle::purge($file,true);
 purgeCheck(!is_plugin_active(plugin_basename($file)) && !wp_next_scheduled('ach_wp_accounts_cleanup') &&
     get_option(Settings::OPTION,null)===null && get_option(Lifecycle::VERSION_OPTION,null)===null && Lifecycle::epoch()==='',
     'Purge left plugin active or options/schedule');
+purgeCheck((int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $wpdb->usermeta WHERE meta_key=%s",\ACh\WPAccounts\EmailRecovery::POLICY))===0,
+    'Purge retained imported recovery policy metadata');
 foreach (Schema::TABLES as $name) {
     purgeCheck($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$wpdb->esc_like(Schema::table($name))))===null,'Plugin table retained');
 }

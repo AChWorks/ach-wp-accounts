@@ -37,6 +37,11 @@ jobs:
           node --check assets/admin.js
       - name: Run isolated WordPress and WooCommerce tests
         run: scripts/test-integration.sh
+      - name: Verify native core minimum and unsupported older core
+        if: matrix.php == '8.1'
+        run: |
+          COMPATIBILITY_ONLY=1 WP_VERSION=6.3 scripts/test-integration.sh
+          COMPATIBILITY_ONLY=1 WP_VERSION=6.2.2 scripts/test-integration.sh
       # The tested merge tree is recorded by Actions; verify that identity
       # before installing the artifact. This is not a release or deployment.
       - name: Prepare exact staging package

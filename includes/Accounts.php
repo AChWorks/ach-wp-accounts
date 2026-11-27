@@ -23,8 +23,8 @@ final class AccountPolicy
         if (!$user->exists() || !$user->roles || array_diff($user->roles, ['subscriber', 'customer'])) {
             return false;
         }
-        $allowed = ['read', 'level_0', 'subscriber', 'customer', 'exist'];
-        if (array_diff(array_keys(array_filter($user->allcaps)), ['read','level_0','subscriber','customer'])) {
+        $allowed = ['read', 'level_0', 'subscriber', 'customer'];
+        if (array_diff(array_keys(array_filter($user->allcaps)), $allowed)) {
             return false;
         }
 
@@ -38,6 +38,8 @@ final class AccountPolicy
             'install_plugins','activate_plugins','update_plugins','delete_plugins','edit_plugins',
             'install_themes','switch_themes','update_themes','delete_themes','edit_themes','edit_theme_options',
             'update_core','edit_files','unfiltered_html','unfiltered_upload','import','export',
+            'upload_plugins','upload_themes','install_languages','update_languages','deactivate_plugins',
+            'update_php','update_https','manage_privacy_options','export_others_personal_data','erase_others_personal_data',
             'edit_posts','publish_posts','edit_others_posts','delete_others_posts','manage_categories','moderate_comments',
             'manage_woocommerce','view_woocommerce_reports',
         ], true);
@@ -46,17 +48,33 @@ final class AccountPolicy
                 $known[$cap] = true;
             }
         }
-        foreach ($allowed as $cap) { unset($known[$cap]); }
-        unset($known['do_not_allow']);
+        // Role catalogs can contain post-type meta capabilities as well as
+        // primitive grants (WooCommerce does this). Do not ask questions
+        // that native authorization requires an object to answer.
+        $objectCaps = ['edit_post','read_post','delete_post','edit_page','read_page','delete_page','publish_post',
+            'edit_comment','edit_term','delete_term','assign_term','edit_user','remove_user',
+            'pay_for_order','view_order','cancel_order','order_again'];
+        foreach (['post','comment','term','user'] as $kind) {
+            foreach (['edit','add','delete'] as $action) {
+                $objectCaps[] = $action.'_'.$kind.'_meta';
+            }
+        }
+        foreach (get_post_types([], 'objects') as $type) {
+            foreach (['edit_post','read_post','delete_post'] as $action) {
+                if (isset($type->cap->$action)) { $objectCaps[] = $type->cap->$action; }
+            }
+        }
+        foreach ([...$allowed,'exist','do_not_allow',...$objectCaps] as $cap) { unset($known[$cap]); }
 
         // Observe effective grants produced during native has_cap checks,
         // including dynamically introduced names absent from the role catalog.
         // Do not modify the capabilities, invoke filters with invented context,
         // cache a result across authorization contexts, or ban extensions.
         $elevated = false;
-        $observe = static function (array $caps, array $required, array $args, \WP_User $subject) use ($user,$allowed,&$elevated): array {
-            if ($subject->ID === $user->ID &&
-                array_diff(array_keys(array_filter($caps)), [...$allowed,'do_not_allow'])) {
+        $probe = 'read';
+        $observe = static function (array $caps, array $required, array $args, \WP_User $subject) use ($user,$allowed,&$elevated,&$probe): array {
+            if ($subject->ID === $user->ID && ($args[0] ?? '') === $probe &&
+                array_diff(array_keys(array_filter($caps)), [...$allowed,'exist','do_not_allow'])) {
                 $elevated = true;
             }
             return $caps;
@@ -65,8 +83,8 @@ final class AccountPolicy
         try {
             $user->has_cap('read');
             if ($elevated) { return false; }
-            foreach (array_keys($known) as $cap) {
-                if ($user->has_cap($cap) || $elevated) { return false; }
+            foreach (array_keys($known) as $probe) {
+                if ($user->has_cap($probe) || $elevated) { return false; }
             }
             return true;
         } catch (\Throwable $error) {
@@ -306,7 +324,17 @@ final class Accounts
                 throw new VerificationError('native_login_required');
             }
             wp_set_current_user($user->ID);
+            // Some native capability filters depend on the current actor.
+            // Re-evaluate in the actual authenticated context; a rejected
+            // cookie's native token is destroyed by the failure path below.
+            if (!AccountPolicy::ordinary(wp_get_current_user())) {
+                throw new VerificationError('native_login_required');
+            }
             do_action('wp_login', $user->user_login, $user);
+            $fresh = get_userdata($user->ID);
+            if (!$fresh || get_current_user_id() !== $user->ID || !AccountPolicy::ordinary($fresh)) {
+                throw new VerificationError('native_login_required');
+            }
             if (function_exists('WC') && WC()->session && is_callable([WC()->session, 'init_session_cookie'])) {
                 WC()->session->init_session_cookie();
             }

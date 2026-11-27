@@ -35,14 +35,16 @@ else
     curl --fail --silent --show-error --location --max-time 120 "https://wordpress.org/wordpress-$wp_version.tar.gz" -o "$lab/wp.tar.gz"
 fi
 tar -xzf "$lab/wp.tar.gz" -C "$lab"
-wc_version="${WC_VERSION:-11.3.1}"
-if [[ -n "${WC_ARCHIVE:-}" ]]; then
-    cp -- "$WC_ARCHIVE" "$lab/wc.zip"
-else
-    curl --fail --silent --show-error --location --max-time 120 "https://downloads.wordpress.org/plugin/woocommerce.$wc_version.zip" -o "$lab/wc.zip"
+if [[ "${COMPATIBILITY_ONLY:-0}" != 1 ]]; then
+    wc_version="${WC_VERSION:-11.3.1}"
+    if [[ -n "${WC_ARCHIVE:-}" ]]; then
+        cp -- "$WC_ARCHIVE" "$lab/wc.zip"
+    else
+        curl --fail --silent --show-error --location --max-time 120 "https://downloads.wordpress.org/plugin/woocommerce.$wc_version.zip" -o "$lab/wc.zip"
+    fi
+    unzip -q "$lab/wc.zip" -d "$lab/wordpress/wp-content/plugins"
+    export ACH_TEST_WC_VERSION="$wc_version"
 fi
-unzip -q "$lab/wc.zip" -d "$lab/wordpress/wp-content/plugins"
-export ACH_TEST_WC_VERSION="$wc_version"
 mkdir "$lab/db"
 mariadb-install-db --no-defaults --datadir="$lab/db" --skip-test-db --auth-root-authentication-method=normal >"$lab/init.log" 2>&1 || { cat "$lab/init.log"; exit 1; }
 mariadbd --no-defaults --datadir="$lab/db" --socket="$socket" --pid-file="$lab/db.pid" --skip-networking --log-error="$lab/db.log" --innodb-buffer-pool-size=64M --max-connections=40 &
@@ -101,6 +103,15 @@ require_once ABSPATH . 'wp-settings.php';
 PHP
 # wp-load.php defines ABSPATH before reading this config.
 "$php_bin" "$repo/tests/install.php"
+if [[ "${COMPATIBILITY_ONLY:-0}" == 1 ]]; then
+    "$php_bin" "$repo/tests/compatibility.php"
+    if "$php_bin" -r 'exit(version_compare($argv[1], "6.3", ">=") ? 0 : 1);' "$wp_version"; then
+        "$php_bin" "$repo/tests/standalone.php"
+    else
+        "$php_bin" "$repo/tests/compatibility.php" forced-active
+    fi
+    exit 0
+fi
 if [[ -n "${OBJECT_CACHE_ARCHIVE:-}" ]]; then
     # Verify the actual external backend and cross-process persistence; never
     # report an object-cache pass if WordPress silently used its runtime cache.
@@ -120,6 +131,7 @@ fi
 "$php_bin" "$repo/tests/operations.php"
 "$php_bin" "$repo/tests/admin.php"
 "$php_bin" "$repo/tests/lifecycle.php"
+"$php_bin" "$repo/tests/review-remediation.php"
 "$php_bin" "$repo/tests/digits-audit.php"
 # Optional pinned, locally provided WP-CLI distribution. No CI download or
 # runtime dependency. The commands use only this private fixture.
@@ -181,6 +193,7 @@ with zipfile.ZipFile(archive) as z:
 assert manifest["sha256"] == hashlib.sha256(archive.read_bytes()).hexdigest()
 assert manifest["size"] == archive.stat().st_size
 assert manifest["requires_php"] == "8.1", "Approved minimum PHP version changed"
+assert manifest["requires_wp"] == "6.3", "Minimum WordPress version mismatch"
 print("PASS: deterministic runtime-only release ZIP, exact expected files and manifest")
 PYTEST
 # The CI staging package uses the exact checkout, including its unreleased

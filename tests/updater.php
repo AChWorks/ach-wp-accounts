@@ -55,6 +55,10 @@ $mock=static function($pre,$args,$url) use (&$requests,&$mode,&$release,&$manife
     if ($url===$metaUrl) {
         $m=$manifest;
         if ($mode==='incompatible') $m['requires_php']='99.0';
+        if ($mode==='wp_incompatible') $m['requires_wp']='99.0';
+        if ($mode==='wp_missing') unset($m['requires_wp']);
+        if ($mode==='wp_empty') $m['requires_wp']='';
+        if ($mode==='wp_invalid') $m['requires_wp']='invalid';
         if ($mode==='wrong_version') $m['version']='999.0.0';
         if ($mode==='changed') $m['sha256']=str_repeat('1',64);
         return $json($m);
@@ -71,9 +75,9 @@ $mock=static function($pre,$args,$url) use (&$requests,&$mode,&$release,&$manife
 };
 add_filter('pre_http_request',$mock,PHP_INT_MAX,3);
 $pluginData=get_plugin_data(WP_PLUGIN_DIR.'/'.$file,false,false);
-checkUpdate($pluginData['UpdateURI']===$base,'Update URI mismatch');
+checkUpdate($pluginData['UpdateURI']===$base && $pluginData['RequiresWP']==='6.3' && $pluginData['RequiresPHP']==='8.1','Native package header mismatch');
 checkUpdate(Updater::update(false,$pluginData,'unrelated/other.php',[])===false && !$requests,'Unrelated plugin update touched network');
-foreach (['offline','no_release','draft','prerelease','missing','wrong_url','bad_digest','wrong_version'] as $mode) {
+foreach (['offline','no_release','draft','prerelease','missing','wrong_url','bad_digest','wrong_version','wp_missing','wp_empty','wp_invalid'] as $mode) {
     checkUpdate(Updater::update(false,$pluginData,$file,[])===false,'Invalid release accepted: '.$mode);
 }
 $mode='ok';
@@ -82,7 +86,7 @@ wp_update_plugins();
 $updates=get_site_transient('update_plugins');
 $item=$updates->response[$file] ?? null;
 checkUpdate(is_object($item) && $item->new_version===$version && $item->package===$package &&
-    $item->ach_sha256===$manifest['sha256'] && $item->requires_php==='8.1','Native plugin update transient missing correct release');
+    $item->ach_sha256===$manifest['sha256'] && $item->requires_php==='8.1' && $item->requires==='6.3','Native plugin update transient missing correct release');
 $details=apply_filters('plugins_api',false,'plugin_information',(object)['slug'=>'ach-wp-accounts']);
 checkUpdate(is_object($details) && $details->version===$version &&
     !str_contains($details->sections['changelog'],'<script>'),'Unsafe or missing release details');
@@ -91,7 +95,7 @@ $before=count($requests);
 checkUpdate(Updater::download(false,$package,null,['plugin'=>'other/file.php'])===false &&
     Updater::download(false,$archive,null,$extra)===false &&
     Updater::download(false,null,null,$extra)===false && count($requests)===$before,'Unrelated/manual update intercepted');
-foreach (['changed'=>'ach_accounts_update_changed','incompatible'=>'ach_accounts_update_compatibility','corrupt'=>'ach_accounts_update_integrity'] as $mode=>$code) {
+foreach (['changed'=>'ach_accounts_update_changed','incompatible'=>'ach_accounts_update_compatibility','wp_incompatible'=>'ach_accounts_update_compatibility','corrupt'=>'ach_accounts_update_integrity'] as $mode=>$code) {
     $result=Updater::download(false,$package,null,$extra);
     checkUpdate(is_wp_error($result) && $result->get_error_code()===$code,'Update rejection failed: '.$mode);
 }
