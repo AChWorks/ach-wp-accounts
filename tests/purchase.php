@@ -1,5 +1,5 @@
 <?php
-use ACh\WPAccounts\{Identity,Settings,SessionProof,CheckoutGate};
+use ACh\WPAccounts\{AccountFlow,Identity,Settings,SessionProof,CheckoutGate,SmsSender,SendResult,Verification};
 $root=getenv('ACH_TEST_WP');
 $dir=getenv('ACH_TEST_DIR');
 if (!$root || !$dir) { throw new RuntimeException('Run isolated fixture.'); }
@@ -30,16 +30,43 @@ final class PurchaseFixtureGateway extends WC_Payment_Gateway {
     }
 }
 add_filter('woocommerce_payment_gateways',static fn($gateways)=>[PurchaseFixtureGateway::class]);
+final class PurchaseFixtureSender implements SmsSender {
+    public string $code='';
+    public int $calls=0;
+    public function id():string {return 'fixture';}
+    public function send(string $mobile,string $code,string $purpose):SendResult {
+        $this->code=$code;
+        $this->calls++;
+        return new SendResult('accepted','fixture','1');
+    }
+}
+function storePurchase(array $billing):WP_REST_Response {
+    $request=new WP_REST_Request('POST','/wc/store/v1/checkout');
+    $request->set_header('Nonce',wp_create_nonce('wc_store_api'));
+    $request->set_param('billing_address',$billing);
+    $request->set_param('payment_method','ach_fixture_purchase');
+    $request->set_param('payment_data',[]);
+    $request->set_param('create_account',false);
+    return rest_do_request($request);
+}
 if ($mode!=='parent') {
     $userId=(int)($argv[2] ?? 0);
     $productId=(int)($argv[3] ?? 0);
     $qualified=($argv[4] ?? '')==='qualified';
-    wp_set_current_user($userId);
     add_action('set_logged_in_cookie',static function($cookie):void {$_COOKIE[LOGGED_IN_COOKIE]=$cookie;});
-    wp_set_auth_cookie($userId,false,true);
+    if ($mode==='store-link') {
+        $user=get_userdata($userId);
+        $signedIn=wp_signon(['user_login'=>$user->user_email,'user_password'=>'fixture-native-email-password'],true);
+        purchaseCheck($signedIn instanceof WP_User && $signedIn->ID===$userId,'Native email sign-in failed');
+        wp_set_current_user($signedIn->ID);
+        purchaseCheck(Identity::byUser($userId)===null,'Native account unexpectedly had a mobile');
+    } else {
+        wp_set_current_user($userId);
+        wp_set_auth_cookie($userId,false,true);
+    }
     $token=SessionProof::currentToken($userId);
-    purchaseCheck($token!=='' && Identity::byUser($userId),'Native checkout session fixture failed');
-    if ($qualified) { SessionProof::record($userId,$token,Identity::byUser($userId)); }
+    purchaseCheck($token!=='' && ($mode==='store-link' || Identity::byUser($userId)),'Native checkout session fixture failed');
+    if ($qualified && $mode!=='store-link') { SessionProof::record($userId,$token,Identity::byUser($userId)); }
     wc_load_cart();
     WC()->payment_gateways()->init();
     WC()->cart->empty_cart();
@@ -63,14 +90,31 @@ if ($mode!=='parent') {
         WC()->checkout()->process_checkout();
         exit;
     }
-    if ($mode==='store') {
-        $request=new WP_REST_Request('POST','/wc/store/v1/checkout');
-        $request->set_header('Nonce',wp_create_nonce('wc_store_api'));
-        $request->set_param('billing_address',$billing);
-        $request->set_param('payment_method','ach_fixture_purchase');
-        $request->set_param('payment_data',[]);
-        $request->set_param('create_account',false);
-        $response=rest_do_request($request);
+    if ($mode==='store-link') {
+        // One actual native email login and cart, rejected before proof, then
+        // first mobile link through the normal domain flow and same checkout.
+        global $wpdb;
+        $count=(int)$wpdb->get_var("SELECT COUNT(*) FROM $wpdb->users");
+        $blocked=storePurchase($billing);
+        purchaseCheck($blocked->get_status()===403 &&
+            $blocked->get_data()['code']==='ach_wp_accounts_mobile_required' &&
+            WC()->cart->get_cart_contents_count()===1,'First-link pre-proof gate lost cart');
+        $flow=new AccountFlow(new Verification());
+        $browser=bin2hex(random_bytes(32));
+        $ticket=$flow->start($browser,'09124440004','link','checkout');
+        $sender=new PurchaseFixtureSender();
+        $sent=$flow->issue($browser,$ticket,'192.0.2.42',$sender);
+        purchaseCheck($sent['state']==='accepted' && $sender->calls===1,'First-link fixture send failed');
+        $linked=$flow->complete($browser,$ticket,$sender->code);
+        purchaseCheck($linked===['outcome'=>'linked','created'=>false] &&
+            (int)Identity::byMobile('09124440004')->user_id===$userId &&
+            get_current_user_id()===$userId && SessionProof::currentToken($userId)===$token &&
+            SessionProof::qualifies() && WC()->cart->get_cart_contents_count()===1 &&
+            (int)$wpdb->get_var("SELECT COUNT(*) FROM $wpdb->users")===$count,
+            'First-link changed native account/session/cart or did not qualify');
+    }
+    if ($mode==='store' || $mode==='store-link') {
+        $response=storePurchase($billing);
         echo wp_json_encode(['status'=>$response->get_status(),'data'=>$response->get_data()]);
         exit;
     }
@@ -130,5 +174,19 @@ foreach (['classic','store'] as $i=>$mode) {
         (float)$order->get_total()===10.0 && get_userdata($id)->user_email==='',
         'Native order ownership, billing contact or payment result invalid');
 }
+$nativeEmail='fixture-purchase-native@example.invalid';
+$nativeId=wp_insert_user(['user_login'=>'fixture_purchase_native','user_pass'=>'fixture-native-email-password',
+    'role'=>'customer','user_email'=>$nativeEmail]);
+purchaseCheck(is_int($nativeId),'Native email customer fixture failed');
+$before=count(file($paid,FILE_IGNORE_NEW_LINES));
+[$linkedPurchase,$state]=childPurchase('store-link',$nativeId,$productId,true);
+purchaseCheck(($linkedPurchase['status'] ?? 0)===200 &&
+    ($linkedPurchase['data']['payment_result']['payment_status'] ?? '')==='success','First-link Store API payment failed');
+$orders=file($paid,FILE_IGNORE_NEW_LINES);
+$order=wc_get_order((int)end($orders));
+purchaseCheck(count($orders)===$before+1 && $state['cart_count']===0 &&
+    $state['email']===$nativeEmail && $order && $order->is_paid() &&
+    $order->get_customer_id()===$nativeId && $order->get_billing_email()==='fixture-order-billing@example.invalid' &&
+    get_userdata($nativeId)->user_email===$nativeEmail,'First-link checkout changed account or payment ownership');
 update_option(Settings::OPTION,$old,false);
-echo "PASS: real native Classic and Store API checkout to isolated successful fixture gateway, negative gate/cart preservation, native order ownership and billing email separation\n";
+echo "PASS: real native Classic and Store API checkout to isolated successful fixture gateway, negative gate/cart preservation, native email sign-in and first-link in the same cart/session, native order ownership and billing email separation\n";

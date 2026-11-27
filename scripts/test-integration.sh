@@ -7,8 +7,13 @@ wp_version="${WP_VERSION:-7.1.5}"
 lab="$(mktemp -d "${TMPDIR:-/tmp}/ach-wpa.XXXXXX")"
 socket="$lab/db.sock"
 db_pid=
+cache_pid=
 cleanup() {
     status=$?
+    if [[ -n "$cache_pid" ]]; then
+        redis-cli -s "$lab/cache.sock" shutdown nosave >/dev/null 2>&1 || kill "$cache_pid" 2>/dev/null || true
+        wait "$cache_pid" 2>/dev/null || true
+    fi
     if [[ -n "$db_pid" ]]; then
         # PID belongs to the child started below; socket never leaves this fixture.
         mariadb-admin --no-defaults --socket="$socket" -uroot shutdown >/dev/null 2>&1 || kill "$db_pid" 2>/dev/null || true
@@ -51,6 +56,24 @@ mariadb --no-defaults --socket="$socket" -uroot -e "CREATE DATABASE accounts_fix
 mkdir "$lab/wordpress/wp-content/plugins/ach-wp-accounts"
 cp -R "$repo/ach-wp-accounts.php" "$repo/includes" "$repo/assets" "$repo/languages" "$lab/wordpress/wp-content/plugins/ach-wp-accounts/"
 export ACH_TEST_WP="$lab/wordpress" ACH_TEST_DIR="$lab" ACH_TEST_WP_VERSION="$wp_version"
+cache_config=
+if [[ -n "${OBJECT_CACHE_ARCHIVE:-}" ]]; then
+    "$php_bin" -r 'if (!extension_loaded("redis")) exit(1);'
+    unzip -q "$OBJECT_CACHE_ARCHIVE" -d "$lab/wordpress/wp-content/plugins"
+    cp "$lab/wordpress/wp-content/plugins/redis-cache/includes/object-cache.php" "$lab/wordpress/wp-content/object-cache.php"
+    redis-server --port 0 --unixsocket "$lab/cache.sock" --unixsocketperm 700 --save "" --appendonly no --dir "$lab" >"$lab/cache.log" 2>&1 &
+    cache_pid=$!
+    for i in $(seq 1 100); do
+        if [[ "$(redis-cli -s "$lab/cache.sock" ping 2>/dev/null)" == PONG ]]; then break; fi
+        kill -0 "$cache_pid"
+        sleep .1
+    done
+    [[ "$(redis-cli -s "$lab/cache.sock" ping)" == PONG ]]
+    cache_config="define('WP_REDIS_SCHEME', 'unix');
+define('WP_REDIS_PATH', '$lab/cache.sock');
+define('WP_REDIS_CLIENT', 'phpredis');
+define('WP_REDIS_PREFIX', 'ach-wpa-fixture:');"
+fi
 cat > "$lab/wordpress/wp-config.php" <<PHP
 <?php
 define('DB_NAME', 'accounts_fixture');
@@ -72,11 +95,18 @@ define('WP_HTTP_BLOCK_EXTERNAL', true);
 define('DISABLE_WP_CRON', true);
 define('WP_ENVIRONMENT_TYPE', 'local');
 define('AUTOMATIC_UPDATER_DISABLED', true);
+$cache_config
 \$table_prefix = 'fixture_';
 require_once ABSPATH . 'wp-settings.php';
 PHP
 # wp-load.php defines ABSPATH before reading this config.
 "$php_bin" "$repo/tests/install.php"
+if [[ -n "${OBJECT_CACHE_ARCHIVE:-}" ]]; then
+    # Verify the actual external backend and cross-process persistence; never
+    # report an object-cache pass if WordPress silently used its runtime cache.
+    "$php_bin" -r 'require getenv("ACH_TEST_WP")."/wp-load.php"; if (!wp_using_ext_object_cache() || !$GLOBALS["wp_object_cache"]->redis_status() || !wp_cache_set("probe", "persisted", "ach-wpa-fixture", 60)) exit(1);'
+    "$php_bin" -r 'require getenv("ACH_TEST_WP")."/wp-load.php"; if (!wp_using_ext_object_cache() || !$GLOBALS["wp_object_cache"]->redis_status() || wp_cache_get("probe", "ach-wpa-fixture") !== "persisted") exit(1); echo "PASS: Redis external object cache, cross-process persistence".PHP_EOL;'
+fi
 "$php_bin" "$repo/tests/integration.php"
 
 "$php_bin" "$repo/tests/providers.php"
