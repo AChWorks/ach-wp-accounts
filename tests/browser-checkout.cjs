@@ -658,9 +658,21 @@ async function tokenPaid(page,button,email,expectedToken,save=false,id=0) {
         await nativeAppearance.locator('input[type=submit]').click();
         await nativeAdmin.waitForURL(/saved=/);
         assert.equal(saved().appearance.accent,'#112233');
-        await nativeAppearance.locator('[name=reset_appearance][type=checkbox]').check();
+        // The JS-disabled page can stall Playwright's animation-frame stability
+        // check after navigation. Verify the real pointer target and use native
+        // input, not a DOM property assignment or forced action.
+        await nativeAdmin.bringToFront();
+        const nativeReset=nativeAppearance.locator('[name=reset_appearance][type=checkbox]');
+        const rect=await nativeReset.evaluate(el=>{
+            el.scrollIntoView({block:'center',inline:'nearest'});
+            const b=el.getBoundingClientRect();
+            return {x:b.x+b.width/2,y:b.y+b.height/2,w:b.width,h:b.height,hit:document.elementFromPoint(b.x+b.width/2,b.y+b.height/2)===el};
+        });
+        assert.ok(rect.w>0&&rect.h>0&&rect.hit,'Reset control is not pointer-accessible');
+        await nativeAdmin.mouse.click(rect.x,rect.y);
+        assert.equal(await nativeReset.isChecked(),true);
         const beforeReset=nativeAdmin.url();
-        await nativeAppearance.locator('input[type=submit]').click();
+        await nativeAppearance.locator('input[type=submit]').press('Enter');
         await nativeAdmin.waitForURL(url=>url.href!==beforeReset&&url.searchParams.has('saved'));
         assert.equal(saved().appearance.accent,'');
         await nativeAdminContext.close();
