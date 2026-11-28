@@ -38,6 +38,7 @@ fi
 mkdir -p "$ACH_TEST_WP/wp-content/mu-plugins"
 cp "$repo/tests/browser-provider.php" "$ACH_TEST_WP/wp-content/mu-plugins/fixture-provider.php"
 cp "$repo/tests/browser-express.js" "$ACH_TEST_WP/wp-content/mu-plugins/fixture-express.js"
+cp "$repo/tests/browser-token.js" "$ACH_TEST_WP/wp-content/mu-plugins/fixture-token.js"
 "$php_bin" "$repo/tests/browser-fixture.php"
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=127.0.0.1' -addext 'subjectAltName=IP:127.0.0.1'     -keyout "$ACH_TEST_DIR/browser.key" -out "$ACH_TEST_DIR/browser.crt" >/dev/null 2>&1
 cat > "$ACH_TEST_DIR/Caddyfile" <<CFG

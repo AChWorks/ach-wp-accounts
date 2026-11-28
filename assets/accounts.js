@@ -40,6 +40,7 @@
         let permit = false;
         let refreshing = false;
         let needsReconcile = false;
+        let paymentRevision = 0;
         let pageAuthenticated = document.body.classList.contains('logged-in');
 
         function classicForm() {
@@ -64,19 +65,98 @@
             return kind === 'blocks' ? stores()?.cart?.getCustomerData()?.billingAddress?.email || ''
                 : classicForm()?.querySelector('[name="billing_email"]')?.value || '';
         }
+        // Only compare native identifiers and consent, never raw card details,
+        // arbitrary gateway data or provider credentials. Native offline
+        // gateways have no extension-owned instrument state.
+        const offlineMethods = new Set(['bacs', 'cheque', 'cod']);
+        const nativeToken = value => {
+            const token = typeof value === 'string' || typeof value === 'number' ? String(value) : '';
+            return /^(?:[1-9][0-9]*|new)$/.test(token) ? token : null;
+        };
+        function formValues(native, accepts) {
+            const fields = [];
+            for (const field of native.elements) {
+                if (!field.name || !accepts(field.name) || field.matches(':disabled') ||
+                    ['button', 'submit', 'reset', 'image', 'file'].includes(field.type) ||
+                    (['radio', 'checkbox'].includes(field.type) && !field.checked)) continue;
+                if (field.multiple && field.options) {
+                    for (const option of field.selectedOptions) fields.push([field.name, option.value]);
+                } else fields.push([field.name, field.value]);
+            }
+            return fields;
+        }
+        function classicPayment(native) {
+            const method = formValues(native, key => key === 'payment_method')[0]?.[1] || '';
+            const tokenKey = 'wc-' + method + '-payment-token';
+            const saveKey = 'wc-' + method + '-new-payment-method';
+            const tokens = formValues(native, key => key === tokenKey).map(([, value]) => nativeToken(value));
+            const consent = formValues(native, key => key === saveKey).map(([, value]) => value === 'true' ? true : null);
+            const selected = [...native.elements].find(field => field.name === 'payment_method' && field.value === method);
+            const box = selected?.closest('.wc_payment_method');
+            const opaqueControls = box && (box.querySelector('iframe, [contenteditable="true"]') ||
+                [...box.querySelectorAll('input,select,textarea')].some(field =>
+                    !field.matches(':disabled') && !['payment_method', tokenKey, saveKey].includes(field.name)));
+            const saved = tokens.length === 1 && tokens[0] !== null && tokens[0] !== 'new';
+            return {
+                value: [method, tokens, consent],
+                comparable: !!method && !opaqueControls && !tokens.includes(null) && !consent.includes(null) &&
+                    (offlineMethods.has(method) || saved)
+            };
+        }
+        function blocksPayment(payment) {
+            if (!payment) return { value: null, comparable: false };
+            const method = payment.getActivePaymentMethod?.() || '';
+            const tokenKey = 'wc-' + method + '-payment-token';
+            const saveKey = 'wc-' + method + '-new-payment-method';
+            const data = payment.getPaymentMethodData?.();
+            const known = new Set(['token', 'payment_method', 'isSavedToken', tokenKey, saveKey]);
+            const opaque = !data || typeof data !== 'object' || Object.keys(data).some(key => !known.has(key));
+            // The generic Blocks data key "token" may instead belong to a
+            // provider. Accept numeric IDs only when WC lists them as saved
+            // native instruments for the selected gateway.
+            const savedIds = new Set(Object.values(payment.getSavedPaymentMethods?.() || {}).flatMap(methods =>
+                Array.isArray(methods) ? methods.filter(entry => entry.method?.gateway === method)
+                    .map(entry => String(entry.tokenId)) : []));
+            const savedToken = value => {
+                const token = nativeToken(value);
+                return token === 'new' || savedIds.has(token) ? token : null;
+            };
+            const active = payment.getActiveSavedToken?.();
+            const token = active === '' ? '' : savedToken(active);
+            const save = payment.getShouldSavePaymentMethod?.();
+            const dataToken = data?.token === undefined ? '' : savedToken(data.token);
+            const methodToken = data?.[tokenKey] === undefined ? '' : savedToken(data[tokenKey]);
+            const saveData = data?.[saveKey] === undefined ? '' :
+                ([true, 'true', false, 'false'].includes(data[saveKey]) ? String(data[saveKey]) : null);
+            const savedFlag = data?.isSavedToken === undefined ? '' :
+                (typeof data.isSavedToken === 'boolean' ? data.isSavedToken : null);
+            const dataMethod = data?.payment_method === undefined ? '' : (data.payment_method === method ? method : null);
+            const values = [method, token, typeof save === 'boolean' ? save : null, dataToken, methodToken, saveData, savedFlag, dataMethod];
+            const saved = token !== '' && token !== null && token !== 'new';
+            return {
+                value: values,
+                comparable: !!method && !opaque && !values.includes(null) && !payment.isExpressPaymentMethodActive?.() &&
+                    !payment.getAvailablePaymentMethods?.()?.[method]?.savedTokenComponent && (offlineMethods.has(method) || saved)
+            };
+        }
         function snapshot() {
             if (kind === 'blocks') {
                 const state = stores();
-                if (!state) return '';
+                if (!state) return null;
                 const cart = state.cart.getCartData();
-                return JSON.stringify([state.cart.getCustomerData(), cart.totals, cart.items?.map(i => [i.key, i.quantity, i.totals]),
-                    cart.coupons, cart.shippingRates, state.payment?.getActivePaymentMethod(), state.checkout?.getOrderNotes()]);
+                const payment = blocksPayment(state.payment);
+                return { value: JSON.stringify([state.cart.getCustomerData(), cart.totals,
+                    cart.items?.map(i => [i.key, i.quantity, i.totals]), cart.coupons, cart.shippingRates,
+                    payment.value, state.checkout?.getOrderNotes()]), comparable: payment.comparable };
             }
             const native = classicForm();
-            if (!native) return '';
-            const fields = [...new FormData(native)].filter(([key]) =>
-                /^(billing_|shipping_|ship_to_different_address|order_comments|payment_method|terms)/.test(key));
-            return JSON.stringify([fields, native.querySelector('.woocommerce-checkout-review-order-table, .shop_table')?.textContent]);
+            if (!native) return null;
+            const payment = classicPayment(native);
+            const fields = formValues(native, key =>
+                /^(billing_|shipping_|ship_to_different_address|order_comments|terms)/.test(key));
+            return { value: JSON.stringify([fields, payment.value,
+                native.querySelector('.woocommerce-checkout-review-order-table, .shop_table')?.textContent]),
+                comparable: payment.comparable };
         }
         function reveal() {
             root.hidden = false;
@@ -105,6 +185,7 @@
         }
 
         async function refreshCheckout(afterProof) {
+            let paymentStateKnown = true;
             const mobileValue = billingMobile() || pending?.proofMobile || '';
             const context = await request('checkout_context', { mobile: mobileValue });
             if (!pending || context.user_id !== pending.userId) {
@@ -146,6 +227,13 @@
                     if (typeof checkoutActions.__internalSetCustomerId !== 'function') throw new Error(strings.checkout_refresh_failed);
                     checkoutActions.__internalSetCustomerId(customerId);
                     await state.data.dispatch(state.wc.cartStore).receiveCart(cart);
+                    // Woo's native cart subscription recalculates available
+                    // methods asynchronously. Await that same native action
+                    // before comparing the selected method/token.
+                    const paymentActions = state.data.dispatch(state.wc.paymentStore);
+                    if (typeof paymentActions.__internalUpdateAvailablePaymentMethods === 'function') {
+                        await paymentActions.__internalUpdateAvailablePaymentMethods();
+                    } else paymentStateKnown = false;
                 }
             } else if (kind === 'classic' && afterProof) {
                 const jq = window.jQuery;
@@ -169,6 +257,7 @@
                 const current = classicForm()?.querySelector('[name="woocommerce-process-checkout-nonce"]');
                 if (current) current.value = context.checkout_nonce;
             }
+            return paymentStateKnown;
         }
 
         async function confirmPayment(afterProof) {
@@ -183,13 +272,19 @@
                 }
                 pending.userId = observed.user_id;
                 needsReconcile = needsReconcile || afterProof || !pageAuthenticated;
-                await refreshCheckout(needsReconcile);
+                const reconciled = needsReconcile;
+                const paymentStateKnown = await refreshCheckout(reconciled);
                 needsReconcile = false;
                 pageAuthenticated = true;
                 if (!pending) return;
-                // Never pay silently after changed account/cart/address/gateway/
-                // totals. The native checkout stays visible for reconfirmation.
-                if (pending.snapshot !== snapshot() || pending.mobile !== billingMobile()) {
+                // Compare native choice and consent as well as checkout state.
+                // For opaque gateway state, do not replay a pre-authentication
+                // payment action across a session/cart refresh. The next
+                // deliberate native attempt needs no additional OTP.
+                const current = snapshot();
+                if (pending.snapshot?.value !== current?.value || pending.mobile !== billingMobile() ||
+                    pending.paymentRevision !== paymentRevision ||
+                    (reconciled && (!paymentStateKnown || !pending.snapshot?.comparable || !current?.comparable))) {
                     finishPayment(false, strings.checkout_changed);
                 } else {
                     finishPayment(true);
@@ -206,7 +301,7 @@
             if (refreshing) return Promise.resolve(false);
             let resolve;
             const promise = new Promise(done => { resolve = done; });
-            const attempt = { promise, resolve, snapshot: snapshot(), mobile: billingMobile(), userId: 0 };
+            const attempt = { promise, resolve, snapshot: snapshot(), mobile: billingMobile(), userId: 0, paymentRevision };
             if (get('profile-link')) get('profile-link').hidden = true;
             get('retry').hidden = true;
             pending = attempt;
@@ -248,6 +343,16 @@
         }
 
         function installCheckout() {
+            // Observe actual interaction in opaque payment UI without reading
+            // its values. Native programmatic updates are compared via state.
+            const paymentInput = event => {
+                if (pending && event.isTrusted && !root.contains(event.target) && event.target.closest?.(
+                    '#payment, .wc-block-checkout__payment-method, .wc-block-checkout__express-payment, .wc-block-components-payment-methods')) {
+                    paymentRevision++;
+                }
+            };
+            document.addEventListener('input', paymentInput, true);
+            document.addEventListener('change', paymentInput, true);
             get('cancel').addEventListener('click', () => {
                 if (busy || refreshing) return;
                 finishPayment(false);
@@ -256,9 +361,23 @@
             if (kind === 'blocks') {
                 const observer = window.wc?.blocksCheckoutEvents?.checkoutEvents?.onCheckoutValidation;
                 if (typeof observer === 'function') {
-                    observer(async () => ({
-                        type: await paymentAttempt() ? 'success' : 'error'
-                    }), 1);
+                    observer(async () => {
+                        if (await paymentAttempt()) return { type: 'success' };
+                        // WC's validation rejection returns checkout to idle,
+                        // but does not end an express attempt. Abort only the
+                        // pre-payment express state; never restore opaque
+                        // provider data or restart payment on the user's behalf.
+                        const state = stores();
+                        if (state?.payment?.isExpressPaymentStarted?.()) {
+                            const actions = state.data.dispatch(state.wc.paymentStore);
+                            if (typeof actions.__internalSetActivePaymentMethod === 'function' &&
+                                typeof actions.__internalSetPaymentIdle === 'function') {
+                                actions.__internalSetActivePaymentMethod('');
+                                actions.__internalSetPaymentIdle();
+                            }
+                        }
+                        return { type: 'error' };
+                    }, 1);
                 }
                 // Unsupported JS adapters still have server enforcement;
                 // expose the same verification after a direct button attempt.

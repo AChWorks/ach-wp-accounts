@@ -16,7 +16,9 @@ final class AuthPage
 
     public static function hooks(): void
     {
-        add_action('template_redirect', [self::class, 'commerce'], 1);
+        // Native WooCommerce endpoint handlers, including email confirmation,
+        // must run before we decide whether to own the ordinary guest page.
+        add_action('template_redirect', [self::class, 'commerce'], 20);
         add_action('login_form_login', [self::class, 'core']);
         add_action('login_form_register', [self::class, 'core']);
     }
@@ -64,21 +66,63 @@ final class AuthPage
         };
     }
 
-    private static function destination(): string
+    private static function destination(string $fallback = ''): string
     {
-        return Frontend::localUrl(self::value($_GET,self::RETURN) ?: self::value($_REQUEST,'redirect_to'), Frontend::defaultRedirect());
+        return Frontend::localUrl(self::value($_GET,self::RETURN) ?: self::value($_REQUEST,'redirect_to'),
+            $fallback ?: Frontend::defaultRedirect());
+    }
+
+    /** Only native workflows that do not render the ordinary guest login. */
+    private static function specialEndpoint(string $endpoint): bool
+    {
+        if (in_array($endpoint,['lost-password','customer-logout','order-pay','order-received'],true)) {
+            return true;
+        }
+        // Newer WC versions have a standalone public withdrawal workflow.
+        $controller = \Automattic\WooCommerce\Internal\OrderWithdrawal\OrderWithdrawalController::class;
+        return class_exists($controller) && wc_get_container()->get($controller)->is_endpoint_request();
+    }
+
+    /** Recognize WC's native valid email-confirmation link, not arbitrary query flags. */
+    private static function emailConfirmationUser(): ?\WP_User
+    {
+        $service = \Automattic\WooCommerce\Internal\CustomerEmailVerification\EmailVerificationService::class;
+        $id = absint(self::value($_GET,'wc_verify_email_user'));
+        $key = sanitize_text_field(self::value($_GET,'wc_verify_email_key'));
+        if (!$id || $key === '' || !class_exists($service)) { return null; }
+        $user = get_user_by('id',$id);
+        return $user instanceof \WP_User && wc_get_container()->get($service)->check_verification_key($id,$key)
+            ? $user : null;
     }
 
     public static function commerce(): void
     {
         if (!BrowserApi::enabled() || is_user_logged_in() || !self::commerceAvailable() ||
-            !function_exists('is_account_page') || !is_account_page() || is_wc_endpoint_url() ||
+            !function_exists('is_account_page') || !is_account_page() ||
             is_feed() || is_embed() || wp_doing_ajax() || (defined('REST_REQUEST') && REST_REQUEST)) {
             return;
         }
-        // WooCommerce processes its standard forms on wp_loaded. On failure,
-        // the same shell renders the native notices and the selected method.
-        self::document('account',self::destination(),self::method('account',self::value($_GET,self::METHOD)));
+        $endpoint = WC()->query->get_current_endpoint();
+        if (self::specialEndpoint($endpoint)) { return; }
+
+        $confirmation = self::emailConfirmationUser();
+        if ($confirmation) {
+            // WC's guest form authenticates a password and may establish a
+            // native login. If public password sign-in is disabled, first
+            // authenticate through the existing mobile flow, then let WC
+            // confirm the key and password in that authenticated session.
+            // Never exempt the guest password check from NativeAccess.
+            if (NativeAccess::passwordAllowed() || !AccountPolicy::ordinary($confirmation)) { return; }
+            self::document('account',Frontend::currentUrl(),'mobile');
+            exit;
+        }
+
+        // WC processes standard forms on wp_loaded. Its ordinary guest
+        // account endpoints all render form-login; use the same standalone
+        // presentation, retaining the actual local destination, not a slug.
+        $fallback = $endpoint !== '' ? remove_query_arg([self::RETURN,self::METHOD,'redirect_to'],Frontend::currentUrl())
+            : Frontend::defaultRedirect();
+        self::document('account',self::destination($fallback),self::method('account',self::value($_GET,self::METHOD)));
         exit;
     }
 
@@ -156,7 +200,8 @@ final class AuthPage
         $logo = (int)get_theme_mod('custom_logo');
         $privacy = get_privacy_policy_url();
         $back = Frontend::localUrl($return,home_url('/'));
-        if (untrailingslashit($back) === untrailingslashit(self::base($context))) { $back = home_url('/'); }
+        if (untrailingslashit($back) === untrailingslashit(self::base($context)) ||
+            ($context === 'account' && $back === Frontend::currentUrl())) { $back = home_url('/'); }
         $terms = $context === 'account' && wc_get_page_id('terms') > 0 ? wc_get_page_permalink('terms') : '';
         ?>
         <!doctype html>

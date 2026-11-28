@@ -12,6 +12,12 @@ if (DB_NAME!=='accounts_fixture' || wp_get_environment_type()!=='local' || get_o
     throw new RuntimeException('Not an isolated browser fixture.');
 }
 $mode=$argv[1] ?? 'setup';
+if ($mode==='routes') {
+    echo wp_json_encode(['account'=>wc_get_page_permalink('myaccount'),
+        'orders'=>wc_get_account_endpoint_url('orders'),'downloads'=>wc_get_account_endpoint_url('downloads'),
+        'editAccount'=>wc_get_account_endpoint_url('edit-account'),'lostPassword'=>wc_lostpassword_url()]);
+    exit;
+}
 if (in_array($mode,['classic','blocks'],true)) {
     update_option('woocommerce_checkout_page_id',(int)get_option('fixture_'.$mode));
     exit;
@@ -26,9 +32,73 @@ if ($mode==='persian') {
     update_option('WPLANG','fa_IR');
     exit;
 }
-if (in_array($mode,['order-pay','order-pay-strict'],true)) {
+if (in_array($mode,['email-confirm-enabled','email-confirm-disabled'],true)) {
+    $enabled=$mode==='email-confirm-enabled';
     $settings=\ACh\WPAccounts\Settings::current();
-    $settings['checkout_reverify']=$mode==='order-pay-strict';
+    $settings['allow_password_login']=$enabled;
+    update_option(\ACh\WPAccounts\Settings::OPTION,$settings,false);
+    $name=$enabled?'fixture_email_enabled':'fixture_email_disabled';
+    $mobile=$enabled?'09125557775':'09125557776';
+    $password='fixture-only-confirm-password-123';
+    $id=wp_insert_user(['user_login'=>$name,'user_email'=>$name.'@example.invalid','user_pass'=>$password,'role'=>'customer']);
+    if (is_wp_error($id)) { throw new RuntimeException($id->get_error_message()); }
+    \ACh\WPAccounts\Identity::bind($id,'+98'.substr($mobile,1),'absent');
+    $link='';
+    add_action('woocommerce_customer_verify_email_notification',static function($userId,$url) use (&$link,$id) {
+        if ($userId===$id) { $link=$url; }
+    },10,2);
+    wc_get_container()->get(\Automattic\WooCommerce\Internal\CustomerEmailVerification\VerificationController::class)->send_verification_email($id);
+    if (!$link) { throw new RuntimeException('Native synthetic confirmation link missing'); }
+    echo wp_json_encode(['url'=>$link,'id'=>$id,'mobile'=>$mobile,'password'=>$password]);
+    exit;
+}
+if ($mode==='email-confirm-state') {
+    $service=wc_get_container()->get(\Automattic\WooCommerce\Internal\CustomerEmailVerification\EmailVerificationService::class);
+    echo wp_json_encode($service->is_verified((int)($argv[2] ?? 0)));
+    exit;
+}
+if ($mode==='token-fixture') {
+    update_option('fixture_token_enabled',true);
+    $owner=\ACh\WPAccounts\Identity::byMobile('+989125557771');
+    if (!$owner) { throw new RuntimeException('Classic fixture owner missing'); }
+    $ids=[];
+    foreach (['1111','2222'] as $last4) {
+        $token=new WC_Payment_Token_CC();
+        $token->set_token('fixture-token-'.$last4);
+        $token->set_gateway_id('fixture_token');
+        $token->set_user_id((int)$owner->user_id);
+        $token->set_card_type('visa');
+        $token->set_last4($last4);
+        $token->set_expiry_month('12');
+        $token->set_expiry_year('2035');
+        $token->set_is_default($last4==='1111');
+        $ids[]=$token->save();
+    }
+    echo wp_json_encode($ids);
+    exit;
+}
+if ($mode==='token-remove') {
+    $token=WC_Payment_Tokens::get((int)($argv[2] ?? 0));
+    if (!$token || $token->get_gateway_id()!=='fixture_token') { throw new RuntimeException('Not a fixture token'); }
+    $token->delete(true);
+    exit;
+}
+if ($mode==='token-disable') {
+    delete_option('fixture_token_enabled');
+    exit;
+}
+if ($mode==='strict-checkout-policy') {
+    $settings=\ACh\WPAccounts\Settings::current();
+    $settings['checkout_reverify']=true;
+    update_option(\ACh\WPAccounts\Settings::OPTION,$settings,false);
+    $owner=\ACh\WPAccounts\Identity::byMobile('+989125557771');
+    global $wpdb;
+    $wpdb->delete(\ACh\WPAccounts\Schema::table('session_proofs'),['user_id'=>$owner->user_id],['%d']);
+    exit;
+}
+if (in_array($mode,['order-pay','order-pay-strict','order-pay-token'],true)) {
+    $settings=\ACh\WPAccounts\Settings::current();
+    $settings['checkout_reverify']=$mode!=='order-pay';
     update_option(\ACh\WPAccounts\Settings::OPTION,$settings,false);
     global $wpdb;
     $owner=\ACh\WPAccounts\Identity::byMobile('+989125557771');
@@ -40,7 +110,7 @@ if (in_array($mode,['order-pay','order-pay-strict'],true)) {
     $order->set_billing_last_name('Customer');
     $order->set_billing_email('historical@example.invalid');
     $order->set_billing_phone('09129999999');
-    $order->set_payment_method('bacs');
+    $order->set_payment_method($mode==='order-pay-token'?'fixture_token':'bacs');
     $order->calculate_totals();
     $order->save();
     echo wp_json_encode(['url'=>$order->get_checkout_payment_url(),'id'=>$order->get_id()]);
@@ -53,6 +123,7 @@ if ($mode==='state') {
         'id'=>$o->get_id(),'customer'=>$o->get_customer_id(),'status'=>$o->get_status(),
         'total'=>$o->get_total(),'items'=>count($o->get_items()),'gateway'=>$o->get_payment_method(),
         'phone'=>$o->get_billing_phone(),'email'=>$o->get_billing_email(),'notes'=>$o->get_customer_note(),
+        'token'=>$o->get_meta('_fixture_token'),'save'=>(bool)$o->get_meta('_fixture_save'),'calls'=>(int)$o->get_meta('_fixture_payment_calls'),
     ],$orders));
     exit;
 }
