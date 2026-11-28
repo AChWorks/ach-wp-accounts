@@ -32,6 +32,53 @@ if ($mode==='experience-policy') {
     update_option(\ACh\WPAccounts\Settings::OPTION,$settings,false);
     exit;
 }
+if ($mode==='reset-fixture') {
+    $login='fixture_browser_reset';
+    $password='fixture-reset-old-password-123';
+    $id=wp_insert_user(['user_login'=>$login,'user_email'=>'reset-fixture@example.invalid','user_pass'=>$password,'role'=>'customer']);
+    if (is_wp_error($id)) throw new RuntimeException($id->get_error_message());
+    $mobile='09125557789';
+    \ACh\WPAccounts\Identity::bind($id,'+98'.substr($mobile,1),'absent');
+    echo wp_json_encode(compact('login','password','mobile'));exit;
+}
+if ($mode==='email-policy') {
+    $s=\ACh\WPAccounts\Settings::current();$s['allow_email_login']=($argv[2]??'')==='on';
+    update_option(\ACh\WPAccounts\Settings::OPTION,$s,false);exit;
+}
+if ($mode==='auth-restriction') {
+    update_option('fixture_native_restriction',($argv[2]??'')==='on');exit;
+}
+if ($mode==='concurrent-admin') {
+    wp_set_current_user(get_user_by('login','fixture_admin')->ID);
+    $s=\ACh\WPAccounts\Settings::current();
+    $result=\ACh\WPAccounts\Settings::update(['verification'=>['cooldown'=>7,'codeLifetime'=>240]],$s['revision']);
+    echo wp_json_encode(['revision'=>$result['revision']]);exit;
+}
+if ($mode==='settings-state') {
+    $s=\ACh\WPAccounts\Settings::current();
+    echo wp_json_encode(['revision'=>$s['revision'],'verification'=>$s['verification'],'appearance'=>$s['appearance'],
+        'template'=>$s['providers']['kavenegar']['default']['template'],
+        'credentialPreserved'=>$s['providers']['kavenegar']['credentials']['api_key']==='fixture-only-key']);exit;
+}
+if ($mode==='appearance-media') {
+    $uploads=wp_upload_dir();
+    if ($uploads['error']) throw new RuntimeException($uploads['error']);
+    $media=static function($name,$mime,$bytes)use($uploads){
+        $file=$uploads['path'].'/'.$name;
+        file_put_contents($file,$bytes);
+        $id=wp_insert_attachment(['post_title'=>$name,'post_mime_type'=>$mime,'post_status'=>'inherit'],$file);
+        if (!is_int($id)||$id<=0)throw new RuntimeException('Attachment fixture failed');
+        update_attached_file($id,$file);return $id;
+    };
+    $png=base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jL6QAAAAASUVORK5CYII=');
+    $logo=$media('fixture-custom-logo.png','image/png',$png);
+    $inherited=$media('fixture-inherited-logo.png','image/png',$png);
+    set_theme_mod('custom_logo',$inherited);
+    $fonts=glob(WP_CONTENT_DIR.'/themes/*/assets/fonts/*/*.woff2');
+    if (!$fonts)throw new RuntimeException('Local fixture font missing');
+    $font=$media('fixture-local-font.woff2','font/woff2',file_get_contents($fonts[0]));
+    echo wp_json_encode(compact('logo','font','inherited'));exit;
+}
 if ($mode==='default-checkout-policy') {
     $settings=\ACh\WPAccounts\Settings::current();
     $settings['checkout_reverify']=false;

@@ -231,10 +231,13 @@ final class AdminView
         }
     }
 
-    public static function render(string $tab, array $settings, array $result): void
+    public static function render(string $tab, array $settings, array $result, bool $fragment = false): void
     {
         Settings::requireOperator();
         self::$result = $result;
+        // Progressive client retains only edited controls; native POST
+        // fallback still renders the submitted non-secret draft.
+        if ($fragment) { unset(self::$result['draft']); }
         $navigation = [
             'loading'=>__('Loading settings…','ach-wp-accounts'),
             'failed'=>__('Settings could not be loaded. Try again.','ach-wp-accounts'),
@@ -245,8 +248,10 @@ final class AdminView
             'stay'=>__('Stay on this tab','ach-wp-accounts'),
             'multiple'=>__('Save each changed form before leaving this tab.','ach-wp-accounts'),
             'retry'=>__('Try again','ach-wp-accounts'),
+            'conflict'=>self::error('settings_conflict'),
+            'reload'=>__('Reload saved settings','ach-wp-accounts'),
         ];
-        echo '<div class="wrap ach-accounts-admin" data-ach-navigation="'.esc_attr(wp_json_encode($navigation)).'"><h1 tabindex="-1">ACh WP Accounts</h1>';
+        echo '<div class="wrap ach-accounts-admin" data-ach-revision="'.esc_attr($settings['revision']).'" data-ach-navigation="'.esc_attr(wp_json_encode($navigation)).'"><h1 tabindex="-1">ACh WP Accounts</h1>';
         self::readiness($settings);
         echo '<nav class="nav-tab-wrapper ach-admin-tabs" aria-label="' . esc_attr__('Account settings','ach-wp-accounts') . '">';
         foreach (Admin::tabs() as $key=>$label) {
@@ -263,7 +268,7 @@ final class AdminView
                 self::paragraph(__('For your protection, re-enter any new credentials before saving.','ach-wp-accounts'));
             }
             if ($result['code'] === 'settings_conflict') {
-                echo '<p><a class="button" href="' . esc_url(Admin::url($tab,$tab==='sms' ? ['provider'=>Admin::editor($settings)] : [])) . '">' .
+                echo '<p><a class="button" data-ach-reload href="' . esc_url(Admin::url($tab,$tab==='sms' ? ['provider'=>Admin::editor($settings)] : [])) . '">' .
                     esc_html__('Reload saved settings','ach-wp-accounts') . '</a></p>';
             }
         } elseif (isset($result['revision']) || (Admin::queryParam('saved') === $settings['revision'] && $settings['revision'] !== 'initial')) {
@@ -319,9 +324,13 @@ final class AdminView
             printf('<div><dt>%s</dt><dd>%s</dd></div>',esc_html($label),esc_html($value));
         }
         echo '</dl>';
-        foreach (['wp'=>__('WordPress','ach-wp-accounts'),'account'=>__('My account','ach-wp-accounts'),'checkout'=>__('Checkout','ach-wp-accounts')] as $context=>$label) {
+        foreach (['wp'=>__('WordPress','ach-wp-accounts'),'account'=>__('My account','ach-wp-accounts')] as $context=>$label) {
             if ($context!=='wp' && !function_exists('WC')) { continue; }
             self::paragraph($label.' — '.__('Email registration','ach-wp-accounts').': '.self::state(Capabilities::emailSignup($context)));
+        }
+        if (function_exists('WC')) {
+            self::paragraph(__('Checkout with a supplied password','ach-wp-accounts').': '.self::state(Capabilities::emailSignup('checkout',true,false)));
+            self::paragraph(__('Checkout with a generated password','ach-wp-accounts').': '.self::state(Capabilities::emailSignup('checkout',true,true)));
         }
         if ($s['allow_email_registration'] && !$s['allow_email_password_reset']) {
             self::paragraph(__('Email registration requiring a native password setup link is unavailable while email password reset is disabled.','ach-wp-accounts'));
@@ -383,9 +392,17 @@ final class AdminView
         self::input('accent',__('Accent color','ach-wp-accounts'),$a['accent'],'text',__('Empty inherits the site color; otherwise use a six-digit hex color.','ach-wp-accounts'),true);
         self::input('background',__('Standalone background color','ach-wp-accounts'),$a['background'],'text',__('Empty inherits the site background.','ach-wp-accounts'),true);
         self::input('radius',__('Corner radius (px)','ach-wp-accounts'),$a['radius']??'','number',__('Empty inherits the default; 0–64 pixels.','ach-wp-accounts'),true);
-        echo '<label>'.esc_html__('Preview width','ach-wp-accounts').' <select data-ach-preview-width><option value="390">'.esc_html__('Mobile','ach-wp-accounts').'</option><option value="680">'.esc_html__('Desktop','ach-wp-accounts').'</option></select></label>';
-        echo '<div class="ach-admin-preview" data-ach-style-preview><p><strong>'.esc_html__('Sign in or register','ach-wp-accounts').'</strong></p><label>'.esc_html__('Mobile number','ach-wp-accounts').'<input disabled dir="ltr" value="0912 ••• 1234"></label><p><button type="button" disabled data-ach-preview-primary>'.esc_html__('Get verification code','ach-wp-accounts').'</button></p></div>';
-        self::checkbox('reset_appearance',__('Reset to inherited appearance','ach-wp-accounts'),false);
+        echo '<label>'.esc_html__('Preview width','ach-wp-accounts').' <select data-ach-preview-width><option value="390">'.esc_html__('Mobile','ach-wp-accounts').'</option><option value="680">'.esc_html__('Desktop','ach-wp-accounts').'</option></select></label> ';
+        echo '<label>'.esc_html__('Preview context','ach-wp-accounts').' <select data-ach-preview-context><option value="standalone">'.esc_html__('Standalone','ach-wp-accounts').'</option><option value="embedded">'.esc_html__('Embedded','ach-wp-accounts').'</option></select></label>';
+        self::paragraph(__('Representative preview; the embedded component inherits the active theme.','ach-wp-accounts'));
+        $media=Appearance::preview($s['appearance']);
+        $inherited=Appearance::preview(Settings::defaults()['appearance']);
+        $savedSelection=[(string)$s['appearance']['logo_mode'],(string)$s['appearance']['logo_id'],(string)$s['appearance']['font_id']];
+        $name=get_bloginfo('name');
+        echo '<div class="ach-admin-preview" data-ach-style-preview data-context="standalone" data-ach-preview-selection="'.esc_attr(wp_json_encode($savedSelection)).'" data-ach-preview-media="'.esc_attr(wp_json_encode($media)).'" data-ach-preview-inherited="'.esc_attr(wp_json_encode($inherited)).'"><div class="ach-admin-preview-card">';
+        echo '<div class="ach-admin-preview-brand" data-ach-preview-brand><img data-ach-preview-logo alt="'.esc_attr($name).'"'.($media['logo']!=='' ? ' src="'.esc_url($media['logo']).'"' : ' hidden').'><span data-ach-preview-name'.($media['logo']!==''?' hidden':'').'>'.esc_html($name).'</span></div>';
+        echo '<p><strong>'.esc_html__('Sign in or register','ach-wp-accounts').'</strong></p><label>'.esc_html__('Mobile number','ach-wp-accounts').'<input disabled dir="ltr" value="0912 ••• 1234"></label><p><button type="button" disabled data-ach-preview-primary>'.esc_html__('Get verification code','ach-wp-accounts').'</button></p></div></div>';
+        self::checkbox('reset_appearance',__('Reset to inherited appearance','ach-wp-accounts'),($a['reset_appearance']??'0')==='1');
         self::endForm(__('Save changes','ach-wp-accounts'));
         echo '</section>';
     }

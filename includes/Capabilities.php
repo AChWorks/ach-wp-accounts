@@ -6,12 +6,15 @@ defined('ABSPATH') || exit;
 /** Effective public methods; site policy remains separate from transient delivery health. */
 final class Capabilities
 {
-    public static function emailSignup(string $context, bool $nativePolicy = true): bool
+    public static function emailSignup(string $context, bool $nativePolicy = true, ?bool $generated = null): bool
     {
         if (!NativeAccess::emailAllowed()) { return false; }
         // Core and WC generated-password registration use the native reset
         // key to set the first password. Do not create an inaccessible account.
-        $generated = $context==='wp' || get_option('woocommerce_registration_generate_password')!=='no';
+        // Presentation knows the My Account form contract. Checkout may
+        // use a different native handler; explicit credentials are checked
+        // again at the executing registration boundary.
+        $generated ??= $context!=='account' || get_option('woocommerce_registration_generate_password')!=='no';
         if ($generated && !Settings::flag('allow_email_password_reset')) { return false; }
         if (!NativeAccess::passwordAllowed() &&
             !(BrowserApi::enabled() && Settings::flag('allow_first_link'))) { return false; }

@@ -56,6 +56,27 @@ final class Appearance
         return '';
     }
 
+    /** Use the same local attachment and URL contract on both surfaces. */
+    private static function fontUrl(array $style): string
+    {
+        $url = $style['font_id'] ? wp_get_attachment_url($style['font_id']) : false;
+        return is_string($url) && Frontend::localUrl($url,'')!=='' &&
+            !preg_match('/[\x00-\x20<>"\x27()\\\\]/',$url) ? $url : '';
+    }
+
+    public static function preview(array $values): array
+    {
+        $style=Settings::previewAppearance($values);
+        $id=self::logo($style);
+        return [
+            'logo'=>$id && wp_attachment_is_image($id) ? (wp_get_attachment_image_url($id,'medium') ?: '') : '',
+            'font'=>self::fontUrl($style),
+            'themeFont'=>self::themeFont(),
+            'themeAccent'=>self::themeColor(['elements','button','color','background']),
+            'themeBackground'=>self::themeColor(['color','background']),
+        ];
+    }
+
     public static function assets(): void
     {
         if (self::$applied) { return; }
@@ -77,12 +98,9 @@ final class Appearance
         }
         if ($style['radius']!==null) { $declarations[]='--ach-radius:'.(int)$style['radius'].'px'; }
         $fontCss='';
-        if ($style['font_id']) {
-            $url=wp_get_attachment_url($style['font_id']);
-            if (is_string($url) && Frontend::localUrl($url,'')!=='' && !preg_match('/[\x00-\x20<>"\x27()\\\\]/',$url)) {
-                $fontCss='@font-face{font-family:ACHAccountLocal;src:url("'.$url.'");font-display:swap;}';
-                $declarations[]='--ach-font:ACHAccountLocal,system-ui,sans-serif';
-            }
+        if ($url=self::fontUrl($style)) {
+            $fontCss='@font-face{font-family:ACHAccountLocal;src:url("'.$url.'");font-display:swap;}';
+            $declarations[]='--ach-font:ACHAccountLocal,system-ui,sans-serif';
         }
         $themeFont=$fontCss==='' ? self::themeFont() : '';
         if ($declarations || $standalone || $fontCss || $themeFont!=='') {
@@ -94,9 +112,9 @@ final class Appearance
         }
     }
 
-    public static function logo(): int
+    public static function logo(?array $style = null): int
     {
-        $style=Settings::appearance();
+        $style??=Settings::appearance();
         return match($style['logo_mode']) {
             'name'=>0,
             'custom'=>$style['logo_id'],

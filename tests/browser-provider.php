@@ -82,3 +82,8 @@ add_action('woocommerce_blocks_payment_method_type_registration',static function
         public function get_payment_method_data() { return ['supports'=>['products','tokenization']]; }
     });
 });
+
+add_filter('wp_authenticate_user',static function($user){
+    return get_option('fixture_native_restriction') && $user->user_login==='fixture_browser_legacy'
+        ? new WP_Error('fixture_native_restriction','Fixture native restriction.') : $user;
+});

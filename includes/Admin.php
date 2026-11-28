@@ -286,6 +286,13 @@ final class Admin
         nocache_headers();
         $fragment = self::queryParam('ach_fragment')==='1';
         if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            if ($fragment && self::tab()==='appearance' && self::queryParam('ach_preview')==='1') {
+                wp_send_json_success(Appearance::preview([
+                    'logo_mode'=>self::queryParam('logo_mode'),
+                    'logo_id'=>max(0,(int)filter_var(Mobile::asciiDigits(trim(self::queryParam('logo_id'))),FILTER_VALIDATE_INT)),
+                    'font_id'=>max(0,(int)filter_var(Mobile::asciiDigits(trim(self::queryParam('font_id'))),FILTER_VALIDATE_INT)),
+                ]));
+            }
             if ($fragment) { self::fragment(); }
             return;
         }
@@ -320,8 +327,9 @@ final class Admin
         // Authenticated native admin page, existing capability and action
         // nonce checks apply. No script injection or cross-origin navigation.
         ob_start();
-        self::render();
+        AdminView::render(self::tab(),Settings::read(),self::$result,true);
         wp_send_json_success(['html'=>ob_get_clean(),'saved'=>isset(self::$result['revision']),
+            'savedRevision'=>self::$result['revision']??null,
             'error'=>isset(self::$result['code'])]);
     }
 
@@ -329,7 +337,7 @@ final class Admin
     private static function draft(#[\SensitiveParameter] array $post): array
     {
         $safe = [];
-        foreach (['ach_action','revision','provider','selected_provider',...Settings::booleanKeys(),'first_name','last_name','logo_mode','logo_id','font_id','accent','background','radius',
+        foreach (['ach_action','revision','provider','selected_provider',...Settings::booleanKeys(),'first_name','last_name','logo_mode','logo_id','font_id','accent','background','radius','reset_appearance',
             'codeLifetime','cooldown','mobileHourly','networkHourly','siteHourly','siteDaily','verifyHourly',
             'diagnostics_retention_hours','purpose','request_id'] as $key) {
             if (is_string($post[$key] ?? null)) {

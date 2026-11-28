@@ -166,6 +166,12 @@ msgstr "در حال بررسی…"
 msgid "Checkout"
 msgstr "تسویه‌حساب"
 
+msgid "Checkout with a generated password"
+msgstr "ثبت‌نام هنگام پرداخت با رمز تولیدشده"
+
+msgid "Checkout with a supplied password"
+msgstr "ثبت‌نام هنگام پرداخت با رمز انتخابی"
+
 msgid "Choose an available recovery method."
 msgstr "روش بازیابی رمز عبور را انتخاب کنید."
 
@@ -312,6 +318,9 @@ msgstr "ثبت‌نام با ایمیل"
 
 msgid "Email registration requiring a native password setup link is unavailable while email password reset is disabled."
 msgstr "ثبت‌نام ایمیلی که به پیوند تعیین رمز بومی نیاز دارد، هنگام غیرفعال بودن بازیابی رمز با ایمیل در دسترس نیست."
+
+msgid "Embedded"
+msgstr "درون صفحه"
 
 msgid "Empty inherits the default; 0–64 pixels."
 msgstr "برای ارث‌بری خالی بگذارید؛ ۰ تا ۶۴ پیکسل."
@@ -664,6 +673,9 @@ msgstr "لطفاً با اطلاعات ورود به حساب فعلی خود و
 msgid "Please start again."
 msgstr "لطفاً دوباره شروع کنید."
 
+msgid "Preview context"
+msgstr "حالت پیش‌نمایش"
+
 msgid "Preview reviewed Digits identities"
 msgstr "پیش‌نمایش هویت‌های بررسی‌شده Digits"
 
@@ -747,6 +759,9 @@ msgstr "حذف پیکربندی"
 
 msgid "Remove saved provider configuration"
 msgstr "حذف پیکربندی ذخیره‌شده ارائه‌دهنده"
+
+msgid "Representative preview; the embedded component inherits the active theme."
+msgstr "پیش‌نمایش نمونه است؛ اجزای درون صفحه از پوستهٔ فعال ارث‌بری می‌کنند."
 
 msgid "Request another link"
 msgstr "درخواست پیوند جدید"
@@ -924,6 +939,9 @@ msgstr "نام سایت"
 
 msgid "Some account data could not be erased. Review and retry the privacy request."
 msgstr "بخشی از اطلاعات حساب قابل پاک‌سازی نبود. درخواست حریم خصوصی را بررسی و دوباره اجرا کنید."
+
+msgid "Standalone"
+msgstr "صفحهٔ مستقل"
 
 msgid "Standalone background color"
 msgstr "رنگ پس‌زمینه صفحه مستقل"

@@ -81,6 +81,12 @@ final class Settings
         return self::styleValues(is_array($stored) ? $stored : [], false);
     }
 
+    /** Preview uses exactly the same tolerant attachment/fallback rules as runtime. */
+    public static function previewAppearance(array $values): array
+    {
+        return self::styleValues($values,false);
+    }
+
     private static function styleValues(array $values, bool $strict = true): array
     {
         $defaults = self::defaults()['appearance'];

@@ -13,6 +13,7 @@ final class AuthPage
     private const METHOD = 'ach_accounts_method';
     private const RETURN = 'ach_accounts_return';
     private const CORE_FORM = 'ach_accounts_native_form';
+    private static ?string $commerceCredentialError = null;
 
     public static function hooks(): void
     {
@@ -21,6 +22,31 @@ final class AuthPage
         add_action('template_redirect', [self::class, 'commerce'], 20);
         add_action('login_form_login', [self::class, 'core']);
         add_action('login_form_register', [self::class, 'core']);
+        add_action('wp_login_failed',[self::class,'recordCommerceCredentialError'],PHP_INT_MAX,2);
+        add_filter('login_errors',[self::class,'commerceLoginError'],PHP_INT_MIN);
+    }
+
+    /** Observe the native error after authentication and all native security hooks.
+     *  WC presents the first WP_Error message through login_errors. Only
+     *  ordinary credential failures on the nonce-bound WC form are replaced.
+     */
+    public static function recordCommerceCredentialError(string $login, \WP_Error $error): void
+    {
+        self::$commerceCredentialError = null;
+        if (!BrowserApi::enabled() || !isset($_POST['login'],$_POST['username'],$_POST['password']) ||
+            !wp_verify_nonce(self::value($_REQUEST,'woocommerce-login-nonce') ?: self::value($_REQUEST,'_wpnonce'),'woocommerce-login')) {
+            return;
+        }
+        if (in_array($error->get_error_code(),['invalid_username','invalid_email','incorrect_password'],true)) {
+            self::$commerceCredentialError = $error->get_error_message();
+        }
+    }
+
+    public static function commerceLoginError(string $message): string
+    {
+        $native = self::$commerceCredentialError;
+        self::$commerceCredentialError = null;
+        return $native!==null && $message===$native ? __('Invalid credentials.','ach-wp-accounts') : $message;
     }
 
     private static function value(array $values, string $key): string
@@ -286,7 +312,7 @@ final class AuthPage
             <div class="ach-auth-brand">
               <a class="ach-auth-back"<?php if ($method!=='mobile' && $method!=='native-reset'): ?> data-ach-method<?php endif; ?> href="<?php echo esc_url($method==='mobile'||$method==='native-reset'?$back:self::url($context,$return)); ?>" aria-label="<?php esc_attr_e('Back','ach-wp-accounts'); ?>"><span aria-hidden="true">←</span></a>
               <a class="ach-auth-logo" href="<?php echo esc_url(home_url('/')); ?>">
-                <?php echo $logo && wp_attachment_is_image($logo) ? wp_get_attachment_image($logo,'medium',false,['class'=>'ach-auth-image','alt'=>$name]) : esc_html($name); ?>
+                <?php echo ($logo && wp_attachment_is_image($logo) ? wp_get_attachment_image($logo,'medium',false,['class'=>'ach-auth-image','alt'=>$name]) : '') ?: esc_html($name); ?>
               </a>
             </div>
             <?php
