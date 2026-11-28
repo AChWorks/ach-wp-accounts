@@ -323,7 +323,10 @@ async function tokenPaid(page,button,email,expectedToken,save=false,id=0) {
         await tokenPage.waitForFunction(id=>window.wp.data.select(window.wc.wcBlocksData.paymentStore).getActiveSavedToken()===String(id),tokens[0]);
         tokenUrl=tokenPage.url();
         await tokenPage.locator(blockButton).click();
-        await tokenPage.locator(codeField).waitFor({state:'visible'});
+        await tokenPage.locator(codeField).waitFor({state:'visible'}).catch(async error=>{
+            console.log('Blocks token verification status:',await tokenPage.locator(otpRoot+' [data-ach-status]').textContent());
+            throw error;
+        });
         // Native state transition (e.g. a method reset during asynchronous
         // payment validation); use the actual WC action and selectors.
         await tokenPage.evaluate(id=>{

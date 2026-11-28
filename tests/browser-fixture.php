@@ -169,7 +169,11 @@ $settings['allow_password_login']=false;
 $settings['selected_provider']='kavenegar';
 $settings['providers']['kavenegar']=['credentials'=>['api_key'=>'fixture-only-key'],
     'default'=>['mode'=>'pattern','template'=>'fixture-template','tokens'=>[]],'purposes'=>[]];
+// This disposable suite deliberately re-verifies one synthetic account
+// across several independent payment scenarios. Rate limits themselves
+// are covered separately by the native concurrency/verification suite.
 $settings['verification']['cooldown']=1;
+$settings['verification']['mobileHourly']=20;
 update_option(\ACh\WPAccounts\Settings::OPTION,$settings,false);
 \ACh\WPAccounts\Settings::sender();
 $legacy=wp_insert_user(['user_login'=>'fixture_browser_legacy','user_email'=>'legacy@example.invalid',
