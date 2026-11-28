@@ -5,7 +5,7 @@ use ACh\WPAccounts\Accounts;
 use ACh\WPAccounts\Identity;
 use ACh\WPAccounts\Schema;
 use ACh\WPAccounts\SessionProof;
-use ACh\WPAccounts\SmsSender;
+use ACh\WPAccounts\MobileCodeDelivery;
 use ACh\WPAccounts\SendResult;
 use ACh\WPAccounts\Verification;
 use ACh\WPAccounts\VerificationError;
@@ -43,7 +43,7 @@ function expectAccountError(callable $call, string ...$expected): void {
     }
     throw new RuntimeException('Expected rejection: ' . implode('/', $expected));
 }
-final class AccountFixtureSender implements SmsSender {
+final class AccountFixtureSender implements MobileCodeDelivery {
     public string $code = '';
     public int $calls = 0;
     public function id(): string { return 'fixture'; }
@@ -392,6 +392,8 @@ $recoveryPassword=wp_generate_password(32);
 $recoverId=wp_insert_user(['user_login'=>'fixture_recover_native','user_email'=>'fixture_recover_native@example.invalid',
     'user_pass'=>$recoveryPassword,'role'=>'customer']);
 ensureAccount(is_int($recoverId),'Recovery fixture creation failed');
+$priorAuth=\ACh\WPAccounts\Settings::flag('auth_enabled');
+fixtureFlag('auth_enabled',true);
 fixtureFlag('allow_password_login',false);
 fixtureFlag('allow_email_registration',false);
 $denied=wp_signon(['user_login'=>'fixture_recover_native','user_password'=>$recoveryPassword],true);
@@ -433,6 +435,7 @@ ensureAccount($allowed instanceof WP_User && $allowed->ID===$recoverId,'Independ
 guest();
 fixtureFlag('allow_email_registration',true);
 unset($recoveryPassword);
+fixtureFlag('auth_enabled',$priorAuth);
 nativeSession($legacyId);
 $cookie=$_COOKIE[LOGGED_IN_COOKIE];
 wp_logout();

@@ -35,6 +35,10 @@ if [[ -n "${WP_FA_ARCHIVE:-}" ]]; then
     unzip -q "$WP_FA_ARCHIVE" -d "$ACH_TEST_WP/wp-content/languages"
     export ACH_TEST_PERSIAN=1
 fi
+if [[ -n "${THEME_ARCHIVE:-}" ]]; then
+    unzip -q "$THEME_ARCHIVE" -d "$ACH_TEST_WP/wp-content/themes"
+    : "${ACH_TEST_THEME:?Specify the fixture theme slug}"
+fi
 mkdir -p "$ACH_TEST_WP/wp-content/mu-plugins"
 cp "$repo/tests/browser-provider.php" "$ACH_TEST_WP/wp-content/mu-plugins/fixture-provider.php"
 cp "$repo/tests/browser-express.js" "$ACH_TEST_WP/wp-content/mu-plugins/fixture-express.js"
@@ -63,3 +67,4 @@ for i in $(seq 1 100); do
 done
 curl -ksSf --max-time 5 "$ACH_BROWSER_URL/wp-login.php" >/dev/null
 "$node_bin" "$repo/tests/browser-checkout.cjs"
+"$node_bin" "$repo/tests/browser-ux.cjs"

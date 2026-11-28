@@ -40,7 +40,10 @@ final class Admin
     public static function tabs(): array
     {
         return [
-            'general'=>__('General','ach-wp-accounts'),
+            'general'=>__('Sign-in and recovery','ach-wp-accounts'),
+            'fields'=>__('Form fields','ach-wp-accounts'),
+            'account'=>__('Account and checkout','ach-wp-accounts'),
+            'appearance'=>__('Appearance','ach-wp-accounts'),
             'sms'=>__('SMS & verification','ach-wp-accounts'),
             'diagnostics'=>__('Diagnostics','ach-wp-accounts'),
         ];
@@ -63,6 +66,7 @@ final class Admin
             'login'=>__('Sign-in and registration','ach-wp-accounts'),
             'link'=>__('Link or change mobile','ach-wp-accounts'),
             'step_up'=>__('Additional mobile verification','ach-wp-accounts'),
+            'password_reset'=>__('Mobile password reset','ach-wp-accounts'),
         ];
     }
 
@@ -162,6 +166,9 @@ final class Admin
         $action = self::str($post,'ach_action');
         $allowed = [
             'general'=>['general'],
+            'account'=>['account'],
+            'fields'=>['fields'],
+            'appearance'=>['appearance'],
             'sms'=>['selection','provider','remove','verification','connection','test_send'],
             'diagnostics'=>['retention'],
         ];
@@ -176,9 +183,34 @@ final class Admin
         $credentialWrite = false;
         switch ($action) {
             case 'general':
-                foreach (['auth_enabled','allow_registration','checkout_required','checkout_reverify','allow_email_registration','allow_password_login'] as $key) {
-                    $patch[$key] = self::boolean($post,$key);
+                foreach (['auth_enabled','allow_registration','allow_email_registration','allow_password_login','allow_email_login',
+                    'allow_first_link','allow_email_password_reset','allow_mobile_password_reset'] as $key) {
+                    if (array_key_exists($key,$post)) { $patch[$key] = self::boolean($post,$key); }
                 }
+                break;
+            case 'account':
+                foreach (['checkout_required','checkout_reverify','allow_recovery_email_enrollment','allow_recovery_password_enrollment'] as $key) {
+                    if (array_key_exists($key,$post)) { $patch[$key] = self::boolean($post,$key); }
+                }
+                break;
+            case 'fields':
+                foreach (array_keys(Settings::defaults()['registration_fields']) as $key) {
+                    $patch['registration_fields'][$key]=self::str($post,$key);
+                }
+                break;
+            case 'appearance':
+                if (self::boolean($post,'reset_appearance')) {
+                    $patch['appearance']=Settings::defaults()['appearance'];
+                    break;
+                }
+                $patch['appearance']=[
+                    'logo_mode'=>self::str($post,'logo_mode'),
+                    'logo_id'=>self::integer($post,'logo_id'),
+                    'font_id'=>self::integer($post,'font_id'),
+                    'accent'=>trim(self::str($post,'accent')),
+                    'background'=>trim(self::str($post,'background')),
+                    'radius'=>self::str($post,'radius')==='' ? null : self::integer($post,'radius'),
+                ];
                 break;
             case 'selection':
                 $patch['selected_provider'] = self::str($post,'selected_provider');
@@ -252,13 +284,22 @@ final class Admin
             wp_die(esc_html__('You do not have permission to manage these settings.','ach-wp-accounts'),'', ['response'=>403]);
         }
         nocache_headers();
+        $fragment = self::queryParam('ach_fragment')==='1';
         if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            if ($fragment && self::tab()==='appearance' && self::queryParam('ach_preview')==='1') {
+                wp_send_json_success(Appearance::preview([
+                    'logo_mode'=>self::queryParam('logo_mode'),
+                    'logo_id'=>max(0,(int)filter_var(Mobile::asciiDigits(trim(self::queryParam('logo_id'))),FILTER_VALIDATE_INT)),
+                    'font_id'=>max(0,(int)filter_var(Mobile::asciiDigits(trim(self::queryParam('font_id'))),FILTER_VALIDATE_INT)),
+                ]));
+            }
+            if ($fragment) { self::fragment(); }
             return;
         }
         $post = wp_unslash($_POST);
         try {
             $result = self::process(self::tab(),$post);
-            if (isset($result['revision'])) {
+            if (isset($result['revision']) && !$fragment) {
                 $args = ['saved'=>$result['revision']];
                 if (self::tab() === 'sms') {
                     $args['provider'] = self::editor(Settings::read());
@@ -278,13 +319,25 @@ final class Admin
         if (isset(self::$result['code']) && self::$result['code'] !== 'invalid_nonce') {
             self::$result['draft'] = self::draft($post);
         }
+        if ($fragment) { self::fragment(); }
+    }
+
+    private static function fragment(): void
+    {
+        // Authenticated native admin page, existing capability and action
+        // nonce checks apply. No script injection or cross-origin navigation.
+        ob_start();
+        AdminView::render(self::tab(),Settings::read(),self::$result,true);
+        wp_send_json_success(['html'=>ob_get_clean(),'saved'=>isset(self::$result['revision']),
+            'savedRevision'=>self::$result['revision']??null,
+            'error'=>isset(self::$result['code'])]);
     }
 
     /** Preserve non-secret values after validation errors, never credentials. */
     private static function draft(#[\SensitiveParameter] array $post): array
     {
         $safe = [];
-        foreach (['ach_action','revision','provider','selected_provider','auth_enabled','allow_registration','checkout_required','checkout_reverify','allow_email_registration','allow_password_login',
+        foreach (['ach_action','revision','provider','selected_provider',...Settings::booleanKeys(),'first_name','last_name','logo_mode','logo_id','font_id','accent','background','radius','reset_appearance',
             'codeLifetime','cooldown','mobileHourly','networkHourly','siteHourly','siteDaily','verifyHourly',
             'diagnostics_retention_hours','purpose','request_id'] as $key) {
             if (is_string($post[$key] ?? null)) {

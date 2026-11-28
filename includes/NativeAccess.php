@@ -8,6 +8,54 @@ final class NativeAccess
 {
     private static bool $reauthenticating = false;
     private static int $applicationUser = 0;
+    private static bool $mobileReset = false;
+    // Request-local contract flags; the Store API reference points to the
+    // existing native request, cleared after its callback. No password copy.
+    private static ?array $customerSignup = null;
+    private static ?\WP_REST_Request $storeCheckout = null;
+
+    public static function checkingMobileReset(): bool
+    {
+        return self::$mobileReset;
+    }
+
+    /** Check native policy without conflating the independent email channel. */
+    public static function mobileResetAllowed(\WP_User $user): bool
+    {
+        $previous = self::$mobileReset;
+        self::$mobileReset = true;
+        try { return wp_is_password_reset_allowed_for_user($user)===true; }
+        finally { self::$mobileReset = $previous; }
+    }
+
+    public static function emailResetAllowed(mixed $allow, int $id): mixed
+    {
+        if ($allow!==true || self::$mobileReset || Settings::flag('allow_email_password_reset') ||
+            AccountPolicy::accountOperator()) { return $allow; }
+        $user = get_userdata($id);
+        return $user instanceof \WP_User && AccountPolicy::ordinary($user) ? false : $allow;
+    }
+
+    public static function validateNativeReset(\WP_Error $errors, mixed $user): void
+    {
+        // Native reset keys issued before a policy change must not bypass it.
+        // Plugin mobile reset/enrollment and administrative profile changes
+        // are distinct, explicitly authorized operations.
+        $native = did_action('login_form_rp') || did_action('login_form_resetpass') ||
+            isset($_POST['wc_reset_password'],$_POST['reset_key']);
+        if ($native && $user instanceof \WP_User &&
+            (self::emailResetAllowed(true,$user->ID)!==true || EmailRecovery::allow(true,$user->ID)!==true)) {
+            $errors->add('ach_accounts_reset_disabled',__('Password reset by email is unavailable for this account.','ach-wp-accounts'));
+        }
+    }
+
+    public static function emailIdentifierAllowed(string $login, \WP_User $user): bool
+    {
+        if (Settings::flag('allow_email_login') || !is_email($login)) { return true; }
+        // An email-shaped exact native username is still a username.
+        $byLogin = get_user_by('login',$login);
+        return $byLogin instanceof \WP_User && $byLogin->ID===$user->ID;
+    }
 
     public static function hooks(): void
     {
@@ -19,9 +67,14 @@ final class NativeAccess
             self::$applicationUser = $user->ID;
         });
         add_filter('authenticate', [self::class, 'password'], PHP_INT_MAX, 3);
+        add_filter('allow_password_reset',[self::class,'emailResetAllowed'],PHP_INT_MAX,2);
+        add_action('validate_password_reset',[self::class,'validateNativeReset'],PHP_INT_MAX,2);
         add_filter('registration_errors', [self::class, 'registration'], PHP_INT_MAX, 3);
         add_filter('woocommerce_registration_errors', [self::class, 'customerRegistration'], PHP_INT_MAX, 3);
         add_filter('woocommerce_process_registration_errors', [self::class, 'commerceRegistration'], PHP_INT_MAX, 4);
+        add_action('woocommerce_after_checkout_validation',[self::class,'classicRegistration'],PHP_INT_MAX,2);
+        add_filter('rest_request_before_callbacks',[self::class,'storeRegistration'],PHP_INT_MAX,3);
+        add_filter('rest_request_after_callbacks',[self::class,'clearStoreRegistration'],PHP_INT_MAX,3);
     }
 
     public static function passwordAllowed(): bool
@@ -42,10 +95,13 @@ final class NativeAccess
         if (self::$reauthenticating && $machine) {
             return new \WP_Error('reauthentication_required');
         }
-        if ($machine || self::$reauthenticating || self::passwordAllowed() || !is_string($password) || $password === '' ||
+        if ($machine || self::$reauthenticating || !is_string($password) || $password === '' ||
             !$result instanceof \WP_User || !AccountPolicy::ordinary($result) ||
             (defined('XMLRPC_REQUEST') && XMLRPC_REQUEST) ||
             (defined('WP_CLI') && WP_CLI)) {
+            return $result;
+        }
+        if (self::passwordAllowed() && is_string($login) && self::emailIdentifierAllowed($login,$result)) {
             return $result;
         }
         return new \WP_Error('ach_accounts_password_disabled',
@@ -65,12 +121,12 @@ final class NativeAccess
         }
     }
 
-    public static function registration(mixed $errors, string $login, string $email): mixed
+    public static function registration(mixed $errors, string $login, string $email, string $context = 'wp', ?bool $generated = null): mixed
     {
         // The shared mobile registration engine calls the native validation
         // hooks with an empty email. Core/WC themselves require a valid email
         // for native public registration, and do not use this exception.
-        if ($errors instanceof \WP_Error && $email !== '' && !self::emailAllowed()) {
+        if ($errors instanceof \WP_Error && $email !== '' && !Capabilities::emailSignup($context,false,$generated)) {
             $errors->add('ach_accounts_email_registration_disabled',
                 __('Registration with email is disabled. Register with your mobile number.', 'ach-wp-accounts'));
         }
@@ -85,11 +141,59 @@ final class NativeAccess
             (defined('REST_REQUEST') && REST_REQUEST && current_user_can('manage_woocommerce'))) {
             return $errors;
         }
-        return self::registration($errors,$login,$email);
+        $contract = self::$customerSignup;
+        self::$customerSignup = null;
+        if (self::$storeCheckout !== null) {
+            // Read the live request at the creation boundary: native route
+            // hooks may normalize its parameters after REST dispatch starts.
+            $billing = self::$storeCheckout->get_param('billing_address');
+            if (is_array($billing) && sanitize_email((string)($billing['email']??''))===$email) {
+                return self::registration($errors,$login,$email,'checkout',empty(self::$storeCheckout->get_param('customer_password')));
+            }
+        }
+        if ($contract !== null && $contract['email']===$email) {
+            return self::registration($errors,$login,$email,$contract['context'],$contract['generated']);
+        }
+        // WC's shared validation hook lacks the password argument. Outside
+        // known public forms do not assume a customer knows a password.
+        return self::registration($errors,$login,$email,'account',true);
     }
 
     public static function commerceRegistration(mixed $errors, string $login, #[\SensitiveParameter] string $password, string $email): mixed
     {
-        return self::registration($errors, $login, $email);
+        $generated = empty($password); // wc_create_new_customer uses empty().
+        self::$customerSignup = null;
+        $errors = self::registration($errors,$login,$email,'account',$generated);
+        if ($errors instanceof \WP_Error && !$errors->has_errors()) {
+            self::$customerSignup = ['email'=>sanitize_email($email),'generated'=>$generated,'context'=>'account'];
+        }
+        return $errors;
+    }
+    /** Classic uses the final normalized posted data, not the My Account option. */
+    public static function classicRegistration(#[\SensitiveParameter] array $data, \WP_Error $errors): void
+    {
+        self::$customerSignup = null;
+        if (is_user_logged_in() || !empty($data['woocommerce_checkout_update_totals']) || (!WC()->checkout()->is_registration_required() && empty($data['createaccount']))) { return; }
+        $email = sanitize_email((string)($data['billing_email']??''));
+        $generated = empty($data['account_password']);
+        self::registration($errors,'',$email,'checkout',$generated);
+        if (!$errors->has_errors()) {
+            self::$customerSignup = ['email'=>$email,'generated'=>$generated,'context'=>'checkout'];
+        }
+    }
+
+    /** REST validation already resolved the actual checkout request schema. */
+    public static function storeRegistration(mixed $response, array $handler, \WP_REST_Request $request): mixed
+    {
+        if ($request->get_route()==='/wc/store/v1/checkout' && $request->get_method()==='POST') {
+            self::$storeCheckout = $request;
+        }
+        return $response;
+    }
+
+    public static function clearStoreRegistration(mixed $response, array $handler, \WP_REST_Request $request): mixed
+    {
+        if (self::$storeCheckout===$request) { self::$storeCheckout=null; }
+        return $response;
     }
 }

@@ -122,12 +122,13 @@ adminCheck(!str_contains($view,'fixture-admin-user') && !str_contains($view,'fix
     str_contains($view,'Pattern values in order'),'Second provider UI failed');
 Admin::process('sms',postAdmin('selection',['selected_provider'=>'kavenegar']));
 $rev=Settings::read()['revision'];
-Admin::process('general',postAdmin('general',['auth_enabled'=>'1','allow_registration'=>'1','checkout_required'=>'1']));
+Admin::process('general',postAdmin('general',['auth_enabled'=>'1','allow_registration'=>'1']));
+Admin::process('account',postAdmin('account',['checkout_required'=>'1']));
 adminCheck(Settings::flag('auth_enabled') && Settings::flag('checkout_required') && Settings::flag('allow_registration'),'General policies not saved');
 adminCheck(!Settings::flag('checkout_reverify'),'Repeat OTP did not default off');
-Admin::process('general',postAdmin('general',['auth_enabled'=>'1','allow_registration'=>'1','checkout_required'=>'1','checkout_reverify'=>'1']));
+Admin::process('account',postAdmin('account',['checkout_required'=>'1','checkout_reverify'=>'1']));
 adminCheck(Settings::flag('checkout_reverify') && Settings::read()['checkout_reverify']===true,'Repeat OTP setting not saved');
-Admin::process('general',postAdmin('general',['auth_enabled'=>'1','allow_registration'=>'1','checkout_required'=>'1','checkout_reverify'=>'0']));
+Admin::process('account',postAdmin('account',['checkout_required'=>'1','checkout_reverify'=>'0']));
 adminCheck(!Settings::flag('checkout_reverify'),'Repeat OTP could not be disabled');
 
 $stale=postAdmin('general',['revision'=>$rev,'auth_enabled'=>'0','checkout_required'=>'0']);
@@ -170,7 +171,8 @@ $_GET=['tab'=>'diagnostics','correlation_id'=>str_repeat('f',32)];
 adminCheck(str_contains(renderAdmin('diagnostics'),'No matching diagnostic events.'),'Diagnostic empty filter state missing');
 Admin::process('sms',postAdmin('remove',['provider'=>'melipayamak','confirm_remove'=>'1']));
 adminCheck(!isset(Settings::current()['providers']['melipayamak']) && Settings::flag('auth_enabled'),'Removing inactive provider changed authentication');
-Admin::process('general',postAdmin('general',['auth_enabled'=>'0','allow_registration'=>'0','checkout_required'=>'0']));
+Admin::process('account',postAdmin('account',['checkout_required'=>'0']));
+Admin::process('general',postAdmin('general',['auth_enabled'=>'0','allow_registration'=>'0']));
 Admin::process('sms',postAdmin('remove',['provider'=>'kavenegar','confirm_remove'=>'1']));
 adminCheck(Settings::current()['providers']===[] && Settings::current()['selected_provider']==='','Disabled provider could not be removed');
 echo "PASS: native admin nonce/capability, provider editing and masking, Persian numeric input, stale drafts, shared policy/test receipts, retention and diagnostic rendering\n";

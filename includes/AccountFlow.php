@@ -64,6 +64,10 @@ final class AccountFlow
             // or silently replace an established identity.
             if ($target !== null) { throw new VerificationError('identity_conflict'); }
             $purpose = 'link';
+        } elseif ($purpose === 'password_reset') {
+            if ($userId!==0 || $context==='checkout' || !Settings::flag('allow_mobile_password_reset')) {
+                throw new VerificationError('method_disabled');
+            }
         } elseif ($purpose === 'login') {
             if ($userId !== 0) {
                 throw new VerificationError('invalid_context');
@@ -96,6 +100,8 @@ final class AccountFlow
             'expires' => time() + 600 + $this->verification->codeLifetime(),
             'recovery_user' => $recovery?->ID ?? 0,
             'recovery_credential' => $recovery ? self::recoveryCredential($recovery) : '',
+            'recovery_email_identifier' => $recovery && is_email($login) && strcasecmp($recovery->user_login,$login)!==0,
+            'reset_authority' => $purpose==='password_reset' ? self::resetSnapshot($target,$id) : '',
             // Only a contact supplied by this browser; never account proof.
             'contact_email' => $context === 'checkout' && $purpose === 'login' ? sanitize_email($contactEmail) : '',
         ];
@@ -119,7 +125,8 @@ final class AccountFlow
         $id = (int)($data['recovery_user'] ?? 0);
         if (!$id) { return null; }
         $user = get_userdata($id);
-        if (get_current_user_id() !== 0 || $data['purpose'] !== 'link' || !$user instanceof \WP_User ||
+        if (!Settings::flag('allow_first_link') || (!empty($data['recovery_email_identifier']) && !Settings::flag('allow_email_login')) ||
+            get_current_user_id() !== 0 || $data['purpose'] !== 'link' || !$user instanceof \WP_User ||
             !AccountPolicy::ordinary($user) || Identity::byUser($id) ||
             !hash_equals($data['recovery_credential'], self::recoveryCredential($user))) {
             throw new VerificationError('identity_changed');
@@ -127,11 +134,31 @@ final class AccountFlow
         return $user;
     }
 
+    private static function resetUser(?object $identity): ?\WP_User
+    {
+        if (!$identity || (int)$identity->verified_at<=0 || !(int)$identity->user_id) { return null; }
+        $user = get_userdata((int)$identity->user_id);
+        return $user instanceof \WP_User && AccountPolicy::ordinary($user) &&
+            NativeAccess::mobileResetAllowed($user) ? $user : null;
+    }
+
+    /** Same opaque ticket shape whether or not the supplied phone is eligible. */
+    private static function resetSnapshot(?object $identity, string $id): string
+    {
+        $user = self::resetUser($identity);
+        return hash_hmac('sha256', "ach-wpa-password-reset\0".$id."\0".
+            ($user ? self::recoveryCredential($user) : 'unavailable'), wp_salt('auth'));
+    }
+
     private static function checkSnapshots(array $data): void
     {
         self::checkRecovery($data);
         $own = Identity::byUser(get_current_user_id());
         $target = Identity::byMobile($data['mobile']);
+        if ($data['purpose']==='password_reset' &&
+            (!Settings::flag('allow_mobile_password_reset') || !hash_equals($data['reset_authority']??'',self::resetSnapshot($target,$data['id'])))) {
+            throw new VerificationError('identity_changed');
+        }
         if (!hash_equals($data['own'], self::snapshot($own, $data['id'], 'own')) ||
             !hash_equals($data['target'], self::snapshot($target, $data['id'], 'target'))) {
             throw new VerificationError('identity_changed');
@@ -159,7 +186,7 @@ final class AccountFlow
         return hash_hmac('sha256', "ach-wpa-flow\0$browser\0$ticket", wp_salt('auth'));
     }
 
-    public function issue(#[\SensitiveParameter] string $browser, #[\SensitiveParameter] string $ticket, string $network, SmsSender $sender): array
+    public function issue(#[\SensitiveParameter] string $browser, #[\SensitiveParameter] string $ticket, string $network, MobileCodeDelivery $sender): array
     {
         $data = self::open($browser, $ticket);
         if ($data['expires'] - time() < $this->verification->codeLifetime()) {
@@ -184,6 +211,78 @@ final class AccountFlow
         $data = self::open($browser, $ticket);
         $flow = self::challengeFlow($ticket, $browser);
         $proof = $this->verification->verify($data['id'], $data['purpose'], $flow, $code);
+        if ($data['purpose']==='password_reset') {
+            $user = self::resetUser(Identity::byMobile($data['mobile']));
+            self::checkSnapshots($data);
+            if (!$user) { throw new VerificationError('reset_unavailable'); }
+            return ['outcome'=>'password_required','proof'=>$proof];
+        }
+        if ($data['purpose']==='login' && !Identity::byMobile($data['mobile']) && Capabilities::registrationFields()) {
+            self::checkSnapshots($data);
+            self::checkNewRegistration($data);
+            return ['outcome'=>'profile_required','proof'=>$proof,'fields'=>Capabilities::registrationFields()];
+        }
+        return $this->finish($data,$flow,$proof);
+    }
+
+    private static function checkNewRegistration(array $data): void
+    {
+        if (!AccountPolicy::registrationAllowed($data['context'])) {
+            throw new VerificationError('registration_disabled');
+        }
+        if (($data['contact_email']??'')!=='' && email_exists($data['contact_email'])) {
+            throw new VerificationError('existing_account_required');
+        }
+    }
+
+    public function continueRegistration(#[\SensitiveParameter] string $browser, #[\SensitiveParameter] string $ticket,
+        #[\SensitiveParameter] string $proof,array $names): array
+    {
+        $data = self::open($browser,$ticket);
+        if ($data['purpose']!=='login' || Identity::byMobile($data['mobile'])) {
+            throw new VerificationError('invalid_context');
+        }
+        self::checkNewRegistration($data);
+        return $this->finish($data,self::challengeFlow($ticket,$browser),$proof,Capabilities::validateNames($names));
+    }
+
+    public function resetPassword(#[\SensitiveParameter] string $browser, #[\SensitiveParameter] string $ticket,
+        #[\SensitiveParameter] string $proof, #[\SensitiveParameter] string $password,
+        #[\SensitiveParameter] string $confirmation): array
+    {
+        $data = self::open($browser,$ticket);
+        if ($data['purpose']!=='password_reset') { throw new VerificationError('invalid_context'); }
+        if (preg_match_all('/./us',$password)<15 || strlen($password)>4096 || trim($password)!==$password ||
+            $password!==$confirmation) { throw new VerificationError('invalid_password'); }
+        $user = self::resetUser(Identity::byMobile($data['mobile']));
+        if (!$user) { throw new VerificationError('reset_unavailable'); }
+        return DatabaseLock::run('mobile-reset-'.$user->ID,function () use ($data,$browser,$ticket,$proof,$password,$user): array {
+            self::checkSnapshots($data);
+            $fresh = self::resetUser(Identity::byMobile($data['mobile']));
+            if (!$fresh || $fresh->ID!==$user->ID) { throw new VerificationError('reset_unavailable'); }
+            $errors = new \WP_Error();
+            do_action('validate_password_reset',$errors,$fresh);
+            if ($errors->has_errors()) { throw new VerificationError('invalid_password'); }
+            $mobile = $this->verification->consume($data['id'],$data['purpose'],self::challengeFlow($ticket,$browser),$proof);
+            if ($mobile!==$data['mobile']) { throw new VerificationError('invalid_context'); }
+            self::checkSnapshots($data);
+            // Native reset owns credential mutation and notifications. It is
+            // deliberately not a sign-in; invalidate existing native sessions.
+            if ($data['context']==='account' && class_exists('WC_Shortcode_My_Account')) {
+                \WC_Shortcode_My_Account::reset_password($fresh,$password);
+                do_action('woocommerce_customer_reset_password',$fresh);
+            } else { reset_password($fresh,$password); }
+            \WP_Session_Tokens::get_instance($fresh->ID)->destroy_all();
+            $updated = get_userdata($fresh->ID);
+            if (!$updated || !wp_check_password($password,$updated->user_pass,$updated->ID)) {
+                throw new VerificationError('password_update_failed');
+            }
+            return ['outcome'=>'password_reset'];
+        },'reset_unavailable');
+    }
+
+    private function finish(array $data,string $flow,#[\SensitiveParameter] string $proof,array $names=[]): array
+    {
         $mobile = $this->verification->consume($data['id'], $data['purpose'], $flow, $proof);
         if ($mobile !== $data['mobile'] || !hash_equals($data['actor'], self::actor())) {
             throw new VerificationError('invalid_context');
@@ -203,7 +302,7 @@ final class AccountFlow
                 // account. Offer the explicit credential + OTP recovery path.
                 throw new VerificationError('existing_account_required');
             }
-            $identity = $identity ?? Accounts::register($mobile, $data['context']);
+            $identity = $identity ?? Accounts::register($mobile, $data['context'], $names);
             Accounts::login($identity);
             return ['outcome' => 'authenticated', 'created' => $created];
         }

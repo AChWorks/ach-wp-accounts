@@ -8,9 +8,16 @@ add_filter('pre_http_request',static function($pre,$args,$url) {
     if (str_ends_with($url,'/verify/lookup.json') && str_contains($url,'fixture-only-key')) {
         $body=$args['body'];
         if (is_string($body)) { parse_str($body,$body); }
+        // Synthetic definite/uncertain outcomes exercise the real adapter
+        // parsing and frontend recovery; never call an external provider.
+        $state=get_option('fixture_ux_sms_state','accepted');
+        if ($state==='failed') {
+            return ['response'=>['code'=>400],'body'=>wp_json_encode(['return'=>['status'=>400]])];
+        }
         file_put_contents(getenv('ACH_TEST_DIR').'/browser-otp.json',wp_json_encode([
             'mobile'=>$body['receptor'],'code'=>$body['token'],
         ]),LOCK_EX);
+        if ($state==='uncertain') { return new WP_Error('fixture_response_lost'); }
         return ['response'=>['code'=>200],'body'=>wp_json_encode(['return'=>['status'=>200],'entries'=>[
             ['messageid'=>123456,'receptor'=>$body['receptor'],'status'=>5],
         ]])];
@@ -81,4 +88,9 @@ add_action('woocommerce_blocks_payment_method_type_registration',static function
         }
         public function get_payment_method_data() { return ['supports'=>['products','tokenization']]; }
     });
+});
+
+add_filter('wp_authenticate_user',static function($user){
+    return get_option('fixture_native_restriction') && $user->user_login==='fixture_browser_legacy'
+        ? new WP_Error('fixture_native_restriction','Fixture native restriction.') : $user;
 });

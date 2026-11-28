@@ -73,3 +73,33 @@
     .ach-accounts-admin .ach-admin-metadata > div { grid-template-columns: minmax(0,1fr); gap: 2px; }
     .ach-accounts-admin .ach-admin-metadata dd { text-align: start; }
 }
+.ach-accounts-admin .ach-admin-preview {
+    max-inline-size: 28rem; margin-block: 16px; padding: 20px;
+    border: 1px solid #dcdcde; border-radius: 12px;
+}
+.ach-accounts-admin .ach-admin-preview input {
+    box-sizing: border-box; display: block; inline-size: 100%;
+    margin-block: 6px 12px; min-block-size: 40px;
+}
+.ach-accounts-admin [data-ach-preview-primary] {
+    display:block; inline-size:100%; padding:12px; border:0;
+    background:#2271b1; color:#fff; border-radius:6px; font:inherit;
+}
+.ach-accounts-admin .ach-admin-dirty-dialog {
+    max-inline-size:calc(100% - 2rem); border:1px solid #dcdcde; padding:20px; border-radius:8px;
+}
+.ach-accounts-admin .ach-admin-dirty-dialog::backdrop { background:#0006; }
+.ach-accounts-admin [data-ach-style-preview] { background:#f6f7f9; }
+.ach-accounts-admin [data-ach-style-preview][data-context="embedded"] { background:#fff; }
+.ach-accounts-admin .ach-admin-preview-card {
+    max-inline-size:28rem; margin-inline:auto; padding:16px;
+    background:#fff; color:#182330; border:1px solid #dcdcde;
+    border-radius:var(--ach-preview-radius,12px); font:inherit;
+}
+.ach-accounts-admin [data-context="embedded"] .ach-admin-preview-card { background:transparent; }
+.ach-accounts-admin .ach-admin-preview-brand { text-align:center; margin-block-end:16px; font-weight:600; }
+.ach-accounts-admin .ach-admin-preview-brand img { max-inline-size:100%; max-block-size:64px; object-fit:contain; }
+.ach-accounts-admin [data-context="embedded"] .ach-admin-preview-brand { display:none; }
+.ach-accounts-admin [data-ach-style-preview] input,
+.ach-accounts-admin [data-ach-style-preview] [data-ach-preview-primary] { border-radius:var(--ach-preview-radius,8px); font:inherit; }
+.ach-accounts-admin [data-ach-style-preview] [data-ach-preview-primary] { background:#135e96; }

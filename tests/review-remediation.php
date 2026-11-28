@@ -1,5 +1,5 @@
 <?php
-use ACh\WPAccounts\{AccountFlow,AccountPolicy,EmailRecovery,Identity,Migration,Privacy,Schema,SessionProof,Settings,VerificationError,SmsSender,SendResult};
+use ACh\WPAccounts\{AccountFlow,AccountPolicy,EmailRecovery,Identity,Migration,Privacy,Schema,SessionProof,Settings,VerificationError,MobileCodeDelivery,SendResult};
 $root=getenv('ACH_TEST_WP');
 $dir=getenv('ACH_TEST_DIR');
 if (!$root || !$dir) { throw new RuntimeException('Run isolated fixture.'); }
@@ -35,7 +35,7 @@ function reviewOtp(string $phone,string $purpose,?string $error=null):array {
     $flow=new AccountFlow();
     $browser=bin2hex(random_bytes(32));
     $ticket=$flow->start($browser,$phone,$purpose,'account');
-    $sender=new class implements SmsSender {
+    $sender=new class implements MobileCodeDelivery {
         public string $code='';
         public function id():string{return 'fixture';}
         public function send(string $mobile,string $code,string $purpose):SendResult {

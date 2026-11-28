@@ -1,7 +1,7 @@
 <?php
 use ACh\WPAccounts\Mobile;
 use ACh\WPAccounts\Schema;
-use ACh\WPAccounts\SmsSender;
+use ACh\WPAccounts\MobileCodeDelivery;
 use ACh\WPAccounts\SendResult;
 use ACh\WPAccounts\Verification;
 use ACh\WPAccounts\VerificationError;
@@ -25,7 +25,7 @@ if (!is_plugin_active('ach-wp-accounts/ach-wp-accounts.php')) {
 }
 require_once WP_PLUGIN_DIR . '/ach-wp-accounts/ach-wp-accounts.php';
 
-final class FixtureSender implements SmsSender
+final class FixtureSender implements MobileCodeDelivery
 {
     public function __construct(private string $file, private string $state = 'accepted') {}
     public function id(): string { return 'fixture'; }

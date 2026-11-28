@@ -4,7 +4,7 @@ namespace ACh\WPAccounts;
 defined('ABSPATH') || exit;
 
 /** Explicit transport selection; the configured mode never falls back automatically. */
-abstract class HttpSmsSender implements SmsSender
+abstract class HttpSmsSender implements MobileCodeDelivery
 {
     public function __construct(#[\SensitiveParameter] protected readonly array $credentials, protected readonly array $default, protected readonly array $purposes = [])
     {
@@ -104,7 +104,7 @@ abstract class HttpSmsSender implements SmsSender
     /** Validate all configured routes without network I/O or duplicating transport rules. */
     final public function validate(): void
     {
-        if (array_diff(array_keys($this->purposes), ['login', 'link', 'step_up'])) {
+        if (array_diff(array_keys($this->purposes), ['login', 'link', 'step_up', 'password_reset'])) {
             throw new \InvalidArgumentException('Invalid verification purpose.');
         }
         foreach ([$this->default, ...array_values($this->purposes)] as $config) {

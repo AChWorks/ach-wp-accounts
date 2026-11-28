@@ -56,7 +56,15 @@ for i in $(seq 1 100); do
 done
 mariadb --no-defaults --socket="$socket" -uroot -e "CREATE DATABASE accounts_fixture CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
 mkdir "$lab/wordpress/wp-content/plugins/ach-wp-accounts"
-cp -R "$repo/ach-wp-accounts.php" "$repo/includes" "$repo/assets" "$repo/languages" "$lab/wordpress/wp-content/plugins/ach-wp-accounts/"
+if [[ "${ACH_BASELINE_UPGRADE:-0}" == 1 ]]; then
+    [[ "${COMPATIBILITY_ONLY:-0}" != 1 && "${ACH_BROWSER_ONLY:-0}" != 1 ]]
+    baseline="$(git -C "$repo" rev-parse 'v0.2.0^{commit}')"
+    [[ "$baseline" == 3a3c0582db703bfcf545cf117a1896d78f91b79a ]]
+    git -C "$repo" archive "$baseline" ach-wp-accounts.php includes assets languages | tar -xf - -C "$lab/wordpress/wp-content/plugins/ach-wp-accounts/"
+    echo "Exact baseline $baseline"
+else
+    cp -R "$repo/ach-wp-accounts.php" "$repo/includes" "$repo/assets" "$repo/languages" "$lab/wordpress/wp-content/plugins/ach-wp-accounts/"
+fi
 export ACH_TEST_WP="$lab/wordpress" ACH_TEST_DIR="$lab" ACH_TEST_WP_VERSION="$wp_version"
 cache_config=
 if [[ -n "${OBJECT_CACHE_ARCHIVE:-}" ]]; then
@@ -103,6 +111,17 @@ require_once ABSPATH . 'wp-settings.php';
 PHP
 # wp-load.php defines ABSPATH before reading this config.
 "$php_bin" "$repo/tests/install.php"
+if [[ "${ACH_BASELINE_UPGRADE:-0}" == 1 ]]; then
+    "$php_bin" "$repo/tests/baseline-upgrade.php" prepare
+    # Reuse the actual native update path against a synthetic stable-release
+    # response; build bytes from this candidate without any publication.
+    python3 "$repo/scripts/build-release.py" --output "$lab/release-fixture" --tested-wp "$wp_version"
+    python3 "$repo/scripts/build-release.py" --candidate --output "$lab/staging-package"
+    cmp "$lab/release-fixture/ach-wp-accounts.zip" "$lab/staging-package/ach-wp-accounts.zip"
+    "$php_bin" "$repo/tests/updater.php"
+    "$php_bin" "$repo/tests/baseline-upgrade.php" verify
+    exit 0
+fi
 if [[ "${COMPATIBILITY_ONLY:-0}" == 1 ]]; then
     "$php_bin" "$repo/tests/compatibility.php"
     if "$php_bin" -r 'exit(version_compare($argv[1], "6.3", ">=") ? 0 : 1);' "$wp_version"; then
@@ -139,6 +158,8 @@ fi
 "$php_bin" "$repo/tests/standalone.php"
 "$php_bin" "$repo/tests/woocommerce.php"
 "$php_bin" "$repo/tests/accounts.php"
+"$php_bin" "$repo/tests/experience.php"
+"$php_bin" "$repo/tests/native-registration.php"
 "$php_bin" "$repo/tests/native-machine.php"
 "$php_bin" "$repo/tests/checkout.php"
 "$php_bin" "$repo/tests/purchase.php"

@@ -38,7 +38,7 @@ final class VerificationPolicy
  */
 final class Verification
 {
-    private const PURPOSES = ['login', 'link', 'step_up'];
+    private const PURPOSES = ['login', 'link', 'step_up', 'password_reset'];
 
     public function __construct(private readonly VerificationPolicy $policy = new VerificationPolicy())
     {
@@ -57,7 +57,7 @@ final class Verification
     private function validateContext(string $id, string $purpose, #[\SensitiveParameter] string $flow, bool $allowTest = false): void
     {
         if (!preg_match('/\A[0-9a-f]{32}\z/D', $id) || !preg_match('/\A[0-9a-f]{64}\z/D', $flow) ||
-            (!in_array($purpose, self::PURPOSES, true) && !($allowTest && in_array($purpose, ['test_login','test_link','test_step_up'], true)))) {
+            (!in_array($purpose, self::PURPOSES, true) && !($allowTest && in_array($purpose, ['test_login','test_link','test_step_up','test_password_reset'], true)))) {
             throw new VerificationError('invalid_context');
         }
     }
@@ -159,7 +159,7 @@ final class Verification
      * request subject to the same quotas. Network must be derived from trusted
      * server request context (not a caller-controlled forwarding header).
      */
-    public function issue(string $id, string $mobile, string $purpose, #[\SensitiveParameter] string $flow, string $network, SmsSender $sender, string $identityRevision = ''): array
+    public function issue(string $id, string $mobile, string $purpose, #[\SensitiveParameter] string $flow, string $network, MobileCodeDelivery $sender, string $identityRevision = ''): array
     {
         global $wpdb;
         $this->validateContext($id, $purpose, $flow, true);

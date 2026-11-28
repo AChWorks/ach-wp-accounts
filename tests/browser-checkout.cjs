@@ -106,8 +106,8 @@ async function tokenPaid(page,button,email,expectedToken,save=false,id=0) {
             await standalone(route,email.href);
         }
         await route.goto(fixture.lostPassword);
-        await route.locator('form.woocommerce-ResetPassword').waitFor({state:'visible'});
-        assert.equal(await route.locator('.ach-auth-shell').count(),0);
+        await route.locator('form[data-ach-native-method=reset-email]').waitFor({state:'visible'});
+        assert.equal(await route.locator('.ach-auth-shell').count(),1);
         await route.goto(base+'/wp-login.php?action=lostpassword');
         await route.locator('#lostpasswordform').waitFor({state:'visible'});
         await standalone(route,fixture.orders);
@@ -149,6 +149,130 @@ async function tokenPaid(page,button,email,expectedToken,save=false,id=0) {
         }
         console.log('PASS: direct account destinations and OTP return, disabled native methods, native password reset/logout and native email confirmation in both password policies');
 
+        command('experience-policy','on');
+        for(const width of [390,768,1280]){
+            const initial=await browser.newContext({ignoreHTTPSErrors:true,javaScriptEnabled:false,viewport:{width,height:900}});
+            const first=await initial.newPage();
+            await first.goto(fixture.account);
+            assert.equal(await first.locator('[data-ach-mobile]').isVisible(),true);
+            assert.equal(await first.locator('[data-ach-submit]').isVisible(),true);
+            assert.equal(await first.locator('[data-ach-submit]').isDisabled(),true);
+            assert.equal(await first.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+            const center=await first.evaluate(()=>{
+                const logo=document.querySelector('.ach-auth-logo').getBoundingClientRect();
+                const brand=document.querySelector('.ach-auth-brand').getBoundingClientRect();
+                return Math.abs(logo.x+logo.width/2-brand.x-brand.width/2);
+            });
+            assert.ok(center<2,'Logo not centered');
+            await first.locator('a[href*="ach_accounts_method=password"]').click();
+            await first.locator('form[data-ach-native-method=password]').waitFor({state:'visible'});
+            await initial.close();
+        }
+        console.log('PASS: stable first paint and centered brand at mobile/tablet/desktop, native password navigation without JS');
+        const experienceContext=await browser.newContext({ignoreHTTPSErrors:true,viewport:{width:390,height:844}});
+        const experience=await experienceContext.newPage();
+        await experience.goto(fixture.account);
+        await experience.locator('[data-ach-mobile]').fill('09125557780');
+        await experience.evaluate(()=>window.achFixtureDocument='same-document');
+        await experience.locator('a[href*="ach_accounts_method=password"]').click();
+        await experience.locator('form[data-ach-native-method=password]').waitFor({state:'visible'});
+        assert.equal(await experience.evaluate(()=>window.achFixtureDocument),'same-document');
+        await experience.locator('a[href*="ach_accounts_method=forgot"]').click();
+        await experience.locator('a[href*="ach_accounts_method=reset-email"]').waitFor({state:'visible'});
+        await experience.locator('a[href*="ach_accounts_method=reset-email"]').click();
+        await experience.locator('form[data-ach-native-method=reset-email]').waitFor({state:'visible'});
+        await experience.locator('form[data-ach-native-method=reset-email] input[name=user_login]').fill('unknown-fixture@example.invalid');
+        await experience.locator('form[data-ach-native-method=reset-email] button[type=submit]').click();
+        await experience.getByText('If the account is eligible for recovery, a password reset link will be sent.',{exact:true}).waitFor();
+        assert.equal(await experience.evaluate(()=>window.achFixtureDocument),'same-document');
+        await experience.locator('a[href*="ach_accounts_method=mobile"]').first().click();
+        await experience.locator('[data-ach-mobile]').waitFor({state:'visible'});
+        assert.equal(await experience.locator('[data-ach-mobile]').inputValue(),'09125557780');
+        await experience.locator('[data-ach-submit]').click();
+        await otp(experience,'09125557780');
+        await experience.locator('[data-ach-name=first_name]').waitFor({state:'visible'});
+        assert.equal(await experience.locator('[data-ach-name=first_name]').evaluate(el=>el.required),true);
+        await experience.locator('[data-ach-name=first_name]').fill('Fixture');
+        await experience.locator('[data-ach-name=last_name]').fill('Experience');
+        await experience.locator('[data-ach-submit]').click();
+        await experience.locator('.woocommerce-MyAccount-navigation').waitFor({state:'visible',timeout:20000});
+        await experience.goto(fixture.editAccount);
+        await experience.locator('[data-ach-change]').waitFor({state:'visible'});
+        assert.match(await experience.locator('[data-ach-description]').innerText(),/verified/i);
+        await experienceContext.close();
+        // Actual ordinary WooCommerce credentials: generic failures, policy
+        // denial and native extension restriction must remain distinct.
+        const credentialContext=await browser.newContext({ignoreHTTPSErrors:true,viewport:{width:390,height:844}});
+        const credential=await credentialContext.newPage();
+        const passwordUrl=new URL(fixture.account);passwordUrl.searchParams.set('ach_accounts_method','password');
+        async function attempt(target,login,password){
+            await target.goto(passwordUrl.href);
+            const form=target.locator('form[data-ach-native-method=password]');
+            await form.locator('[name=username]').fill(login);
+            await form.locator('[name=password]').fill(password);
+            await form.locator('button[type=submit]').click();
+        }
+        command('email-policy','on');
+        for(const login of ['fixture_missing_customer','fixture_browser_legacy','missing@example.invalid','legacy@example.invalid']){
+            await attempt(credential,login,'fixture-wrong-password-123');
+            await credential.getByText('Invalid credentials.',{exact:false}).first().waitFor({state:'visible'});
+        }
+        command('auth-restriction','on');
+        await attempt(credential,'fixture_browser_legacy','fixture-only-legacy-password-123');
+        await credential.getByText('Fixture native restriction.',{exact:false}).first().waitFor({state:'visible'});
+        command('auth-restriction','off');
+        command('email-policy','off');
+        await attempt(credential,'legacy@example.invalid','fixture-only-legacy-password-123');
+        await credential.getByText('Password sign-in is unavailable for this account.',{exact:false}).first().waitFor({state:'visible'});
+        await attempt(credential,'fixture_browser_legacy','fixture-only-legacy-password-123');
+        await credential.locator('.woocommerce-MyAccount-navigation').waitFor({state:'visible'});
+        await credentialContext.close();
+        command('email-policy','on');
+        console.log('PASS: actual WC generic credential errors, independent email identifier, native restriction and exact username success');
+
+        // Dedicated complete reset: existing native session, wrong OTP,
+        // correct OTP, password confirmation, reset without login and revocation.
+        const reset=JSON.parse(command('reset-fixture'));
+        const priorContext=await browser.newContext({ignoreHTTPSErrors:true,viewport:{width:390,height:844}});
+        const prior=await priorContext.newPage();
+        await attempt(prior,reset.login,reset.password);
+        await prior.locator('.woocommerce-MyAccount-navigation').waitFor({state:'visible'});
+        const resetContext=await browser.newContext({ignoreHTTPSErrors:true,viewport:{width:390,height:844}});
+        const recovery=await resetContext.newPage();
+        await recovery.goto(fixture.account);
+        await recovery.locator('a[data-ach-reset]').click();
+        await recovery.locator('a[href*="ach_accounts_method=reset-mobile"]').click();
+        await recovery.locator('[data-ach-mobile]').fill(reset.mobile);
+        await recovery.locator('[data-ach-submit]').click();
+        await recovery.locator(codeField).waitFor({state:'visible'});
+        const goodCode=JSON.parse(fs.readFileSync(otpFile,'utf8')).code;
+        await recovery.locator(codeField).fill((goodCode[0]==='0'?'1':'0')+goodCode.slice(1));
+        await recovery.locator('[data-ach-submit]').click();
+        await recovery.waitForFunction(()=>document.querySelector('[data-ach-status]')?.dataset.error==='1');
+        await otp(recovery,reset.mobile);
+        await recovery.locator('[data-ach-reset-new]').waitFor({state:'visible'});
+        const newPassword='fixture-reset-new-password-456';
+        await recovery.locator('[data-ach-reset-new]').fill(newPassword);
+        await recovery.locator('[data-ach-reset-confirm]').fill('fixture-mismatch-password-456');
+        await recovery.locator('[data-ach-submit]').click();
+        await recovery.waitForFunction(()=>document.querySelector('[data-ach-status]')?.dataset.error==='1');
+        await recovery.locator('[data-ach-reset-confirm]').fill(newPassword);
+        await recovery.locator('[data-ach-submit]').click();
+        await recovery.getByText('Your password was reset. Sign in again.',{exact:true}).waitFor({state:'visible'});
+        assert.equal(await recovery.locator('.woocommerce-MyAccount-navigation').count(),0);
+        await prior.goto(fixture.account);
+        await prior.locator('[data-ach-mobile]').waitFor({state:'visible'});
+        await priorContext.close();
+        await recovery.locator('[data-ach-success-continue]').click();
+        await recovery.locator('[data-ach-mobile]').waitFor({state:'visible'});
+        await attempt(recovery,reset.login,reset.password);
+        await recovery.getByText('Invalid credentials.',{exact:false}).first().waitFor({state:'visible'});
+        await attempt(recovery,reset.login,newPassword);
+        await recovery.locator('.woocommerce-MyAccount-navigation').waitFor({state:'visible'});
+        await resetContext.close();
+        console.log('PASS: dedicated mobile password-reset browser, wrong OTP, mismatch, native revocation and new-password sign-in');
+        command('experience-policy','off');
+        console.log('PASS: same-document native method navigation, generic email-reset result, preserved phone draft, proof-bound registration name fields, native profile');
         command('classic');
         await addCart(page,fixture.classic);
         await page.locator('form.checkout #place_order').waitFor();
@@ -394,6 +518,165 @@ async function tokenPaid(page,button,email,expectedToken,save=false,id=0) {
         await admin.waitForFunction(()=>document.querySelector('table tbody')?.innerText.includes('09125557771') &&
             !document.querySelector('table tbody')?.innerText.includes('09125557772'),{},{timeout:15000});
         console.log('PASS: actual WooCommerce Customers native table and mobile search UI');
+        await admin.goto(base+'/wp-admin/admin.php?page=ach-wp-accounts');
+        await admin.locator('.ach-accounts-admin').waitFor();
+        await admin.evaluate(()=>window.achAdminDocument='same-document');
+        await admin.locator('.ach-admin-tabs a[href*="tab=fields"]').click();
+        await admin.locator('[data-ach-field-preview]').waitFor({state:'visible'});
+        assert.equal(await admin.evaluate(()=>window.achAdminDocument),'same-document');
+        await admin.locator('select[name=first_name]').selectOption('required');
+        await admin.locator('.ach-admin-tabs a[href*="tab=appearance"]').click();
+        await admin.locator('.ach-admin-dirty-dialog').waitFor({state:'visible'});
+        await admin.locator('.ach-admin-dirty-dialog button').last().click();
+        assert.equal(await admin.locator('select[name=first_name]').inputValue(),'required');
+        await admin.locator('.ach-admin-tabs a[href*="tab=appearance"]').click();
+        await admin.locator('.ach-admin-dirty-dialog button').first().click();
+        await admin.locator('[data-ach-style-preview]').waitFor({state:'visible'});
+        assert.equal(await admin.evaluate(()=>window.achAdminDocument),'same-document');
+        await admin.locator('.ach-admin-tabs a[href*="tab=fields"]').click();
+        await admin.locator('select[name=first_name]').waitFor({state:'visible'});
+        assert.equal(await admin.locator('select[name=first_name]').inputValue(),'required');
+        await admin.locator('select[name=first_name]').selectOption('off');
+        await admin.locator('form[data-ach-admin-form=fields] input[type=submit]').click();
+        await admin.waitForFunction(()=>!document.querySelector('.ach-accounts-admin')?.hasAttribute('aria-busy'));
+        console.log('PASS: native admin progressive tabs, dirty stay/save navigation and persisted profile-field policy');
+        const adminRoot=admin.locator('.ach-accounts-admin');
+        const adminForm=action=>admin.locator('form[data-ach-admin-form="'+action+'"]');
+        const currentRevision=()=>adminRoot.getAttribute('data-ach-revision');
+        const formRevision=action=>adminForm(action).locator('[name=revision]').inputValue();
+        const saved=()=>JSON.parse(command('settings-state'));
+        await admin.locator('.ach-admin-tabs a[href*="tab=sms"]').click();
+        await adminForm('provider').waitFor();
+        const staleRevision=await currentRevision();
+        const provider=adminForm('provider');
+        const verification=adminForm('verification');
+        await provider.locator('[name="default[template]"]').fill('fixture-draft-template');
+        await provider.locator('[name="credentials[api_key]"]').fill('fixture-unsent-secret');
+        await verification.locator('[name=cooldown]').fill('9');
+        const external=JSON.parse(command('concurrent-admin')).revision;
+        await verification.locator('input[type=submit]').click();
+        await admin.waitForFunction(rev=>document.querySelector('.ach-accounts-admin')?.dataset.achRevision===rev,external);
+        assert.equal(await formRevision('verification'),staleRevision);
+        assert.equal(await formRevision('provider'),staleRevision);
+        assert.equal(await verification.locator('[name=cooldown]').inputValue(),'9');
+        assert.equal(await verification.locator('[name=codeLifetime]').inputValue(),'240','Untouched field copied from stale snapshot');
+        assert.equal(await provider.locator('[name="default[template]"]').inputValue(),'fixture-draft-template');
+        assert.equal(await provider.locator('[name="credentials[api_key]"]').inputValue(),'fixture-unsent-secret');
+        await adminForm('selection').locator('input[type=submit]').click();
+        await admin.waitForFunction(rev=>document.querySelector('.ach-accounts-admin')?.dataset.achRevision!==rev,external);
+        assert.equal(await formRevision('provider'),staleRevision);
+        assert.equal(await formRevision('verification'),staleRevision);
+        const latest=await currentRevision();
+        // Stale provider submit must be rejected and submitted credentials
+        // must not appear in a returned fragment or be persisted.
+        const conflictResponse=admin.waitForResponse(r=>r.request().method()==='POST'&&r.url().includes('ach_fragment=1'));
+        await provider.locator('input[type=submit]').click();
+        const response=await conflictResponse;
+        const payload=await response.json();
+        assert.equal(payload.data.saved,false);
+        assert.ok(!JSON.stringify(payload).includes('fixture-unsent-secret'));
+        await admin.waitForFunction(()=>!document.querySelector('.ach-accounts-admin')?.hasAttribute('aria-busy'));
+        assert.equal(await provider.locator('[name="credentials[api_key]"]').inputValue(),'');
+        assert.equal(await provider.locator('[name="default[template]"]').inputValue(),'fixture-draft-template');
+        assert.equal(await formRevision('provider'),staleRevision);
+        assert.equal(saved().verification.cooldown,7);
+        assert.equal(saved().verification.codeLifetime,240);
+        assert.equal(saved().template,'fixture-template');
+        assert.equal(saved().credentialPreserved,true);
+        await provider.getByRole('button',{name:'Reload saved settings'}).click();
+        await admin.locator('.ach-admin-dirty-dialog button').last().click();
+        assert.equal(await provider.locator('[name="default[template]"]').inputValue(),'fixture-draft-template');
+        await provider.getByRole('button',{name:'Reload saved settings'}).click();
+        await admin.locator('.ach-admin-dirty-dialog button').nth(1).click();
+        await admin.waitForFunction(rev=>document.querySelector('form[data-ach-admin-form=provider] [name=revision]')?.value===rev,latest);
+        assert.equal(await provider.locator('[name="default[template]"]').inputValue(),'fixture-template');
+        assert.equal(await verification.locator('[name=cooldown]').inputValue(),'7');
+        // Same-transition independent draft can safely advance when no
+        // intervening write exists; save only intended edits.
+        await verification.locator('[name=cooldown]').fill('8');
+        await adminForm('selection').locator('input[type=submit]').click();
+        await admin.waitForFunction(rev=>document.querySelector('.ach-accounts-admin')?.dataset.achRevision!==rev,latest);
+        assert.equal(await formRevision('verification'),await currentRevision());
+        assert.equal(await verification.locator('[name=cooldown]').inputValue(),'8');
+        await verification.locator('input[type=submit]').click();
+        await admin.waitForFunction(()=>!document.querySelector('.ach-accounts-admin')?.hasAttribute('aria-busy'));
+        assert.equal(saved().verification.cooldown,8);
+        assert.equal(saved().credentialPreserved,true);
+        console.log('PASS: actual multiple dirty forms, concurrent CAS denial, fresh save, secret protection and explicit discard/reconciliation');
+
+        const media=JSON.parse(command('appearance-media'));
+        await admin.locator('.ach-admin-tabs a[href*="tab=appearance"]').click();
+        const style=admin.locator('[data-ach-style-preview]');
+        const appearance=adminForm('appearance');
+        const logo=style.locator('[data-ach-preview-logo]');
+        await style.waitFor({state:'visible'});
+        await admin.waitForFunction(()=>document.querySelector('[data-ach-preview-logo]')?.naturalWidth>0);
+        assert.match(await logo.getAttribute('src'),/fixture-inherited-logo/);
+        await appearance.locator('[name=logo_mode]').selectOption('custom');
+        await appearance.locator('[name=logo_id]').fill(String(media.logo));
+        await appearance.locator('[name=font_id]').fill(String(media.font));
+        await admin.waitForFunction(()=>document.querySelector('[data-ach-preview-logo]')?.src.includes('fixture-custom-logo') &&
+            document.querySelector('[data-ach-preview-logo]').naturalWidth>0 &&
+            getComputedStyle(document.querySelector('[data-ach-style-preview]')).fontFamily.includes('ACHAccountPreview'));
+        await appearance.locator('[name=accent]').fill('#abcdef');
+        await appearance.locator('[name=background]').fill('#fedcba');
+        await appearance.locator('[name=radius]').fill('17');
+        assert.equal(await style.locator('[data-ach-preview-primary]').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(171, 205, 239)');
+        assert.equal(await style.evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(254, 220, 186)');
+        assert.equal(await style.locator('[data-ach-preview-primary]').evaluate(e=>getComputedStyle(e).borderRadius),'17px');
+        await appearance.locator('[data-ach-preview-context]').selectOption('embedded');
+        assert.equal(await style.locator('[data-ach-preview-brand]').isVisible(),false);
+        assert.notEqual(await style.evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(254, 220, 186)');
+        await appearance.locator('[data-ach-preview-context]').selectOption('standalone');
+        await appearance.locator('[name=logo_id]').fill('999999');
+        await appearance.locator('[name=font_id]').fill('999999');
+        await admin.waitForFunction(()=>document.querySelector('[data-ach-preview-logo]')?.src.includes('fixture-inherited-logo') &&
+            !getComputedStyle(document.querySelector('[data-ach-style-preview]')).fontFamily.includes('ACHAccountPreview'));
+        await appearance.locator('[name=logo_mode]').selectOption('name');
+        await style.locator('[data-ach-preview-name]').waitFor({state:'visible'});
+        await appearance.locator('[name=reset_appearance][type=checkbox]').check();
+        await admin.waitForFunction(()=>document.querySelector('[data-ach-preview-logo]')?.src.includes('fixture-inherited-logo') &&
+            !getComputedStyle(document.querySelector('[data-ach-style-preview]')).fontFamily.includes('ACHAccountPreview'));
+        assert.notEqual(await style.locator('[data-ach-preview-primary]').evaluate(e=>getComputedStyle(e).borderRadius),'17px');
+        await appearance.locator('input[type=submit]').click();
+        await admin.waitForFunction(()=>!document.querySelector('.ach-accounts-admin')?.hasAttribute('aria-busy'));
+        assert.equal(saved().appearance.logo_mode,'inherit');
+        assert.equal(saved().appearance.font_id,0);
+        assert.equal(saved().appearance.accent,'');
+        console.log('PASS: inherited/custom logo and local font, missing attachment fallback, accent/background/radius, embedded context and reset');
+        // Native fallback: settings remain usable without the controller.
+        const nativeAdminContext=await browser.newContext({ignoreHTTPSErrors:true,javaScriptEnabled:false,viewport:{width:1280,height:900}});
+        const nativeAdmin=await nativeAdminContext.newPage();
+        await nativeAdmin.goto(base+'/wp-login.php?redirect_to='+encodeURIComponent(base+'/wp-admin/'));
+        await nativeAdmin.locator('#user_login').fill('fixture_admin');
+        await nativeAdmin.locator('#user_pass').fill('fixture-only-admin-password-123');
+        await nativeAdmin.locator('#wp-submit').click();
+        await nativeAdmin.waitForURL(/wp-admin/);
+        await nativeAdmin.goto(base+'/wp-admin/admin.php?page=ach-wp-accounts&tab=appearance');
+        const nativeAppearance=nativeAdmin.locator('form[data-ach-admin-form=appearance]');
+        await nativeAppearance.locator('[name=accent]').fill('#112233');
+        await nativeAppearance.locator('input[type=submit]').click();
+        await nativeAdmin.waitForURL(/saved=/);
+        assert.equal(saved().appearance.accent,'#112233');
+        // The JS-disabled page can stall Playwright's animation-frame stability
+        // check after navigation. Verify the real pointer target and use native
+        // input, not a DOM property assignment or forced action.
+        await nativeAdmin.bringToFront();
+        const nativeReset=nativeAppearance.locator('[name=reset_appearance][type=checkbox]');
+        const rect=await nativeReset.evaluate(el=>{
+            el.scrollIntoView({block:'center',inline:'nearest'});
+            const b=el.getBoundingClientRect();
+            return {x:b.x+b.width/2,y:b.y+b.height/2,w:b.width,h:b.height,hit:document.elementFromPoint(b.x+b.width/2,b.y+b.height/2)===el};
+        });
+        assert.ok(rect.w>0&&rect.h>0&&rect.hit,'Reset control is not pointer-accessible');
+        await nativeAdmin.mouse.click(rect.x,rect.y);
+        assert.equal(await nativeReset.isChecked(),true);
+        const beforeReset=nativeAdmin.url();
+        await nativeAppearance.locator('input[type=submit]').press('Enter');
+        await nativeAdmin.waitForURL(url=>url.href!==beforeReset&&url.searchParams.has('saved'));
+        assert.equal(saved().appearance.accent,'');
+        await nativeAdminContext.close();
+        console.log('PASS: native appearance settings save/reset without JavaScript');
         await adminContext.close();
 
 
@@ -417,6 +700,24 @@ async function tokenPaid(page,button,email,expectedToken,save=false,id=0) {
             await auth.locator('[data-ach-submit]').click();
             await auth.locator('.woocommerce-MyAccount-navigation').waitFor({state:'visible',timeout:20000});
             console.log('PASS: official Persian locale, RTL at 390px, LTR number/code input, keyboard focus and Persian-digit OTP sign-in');
+            const rtlAdmin=await browser.newContext({ignoreHTTPSErrors:true,viewport:{width:390,height:844}});
+            const rtlSettings=await rtlAdmin.newPage();
+            await rtlSettings.goto(base+'/wp-login.php?redirect_to='+encodeURIComponent(base+'/wp-admin/'));
+            await rtlSettings.locator('#user_login').fill('fixture_admin');
+            await rtlSettings.locator('#user_pass').fill('fixture-only-admin-password-123');
+            await rtlSettings.locator('#wp-submit').click();
+            await rtlSettings.waitForURL(/wp-admin/);
+            await rtlSettings.goto(base+'/wp-admin/admin.php?page=ach-wp-accounts&tab=appearance');
+            const rtlPreview=rtlSettings.locator('[data-ach-style-preview]');
+            await rtlPreview.waitFor({state:'visible'});
+            assert.equal(await rtlSettings.locator('html').getAttribute('dir'),'rtl');
+            assert.equal(await rtlPreview.evaluate(e=>getComputedStyle(e).direction),'rtl');
+            await rtlSettings.locator('[data-ach-preview-context]').selectOption('embedded');
+            assert.equal(await rtlPreview.locator('[data-ach-preview-brand]').isVisible(),false);
+            await rtlSettings.locator('[data-ach-preview-width]').selectOption('680');
+            assert.equal(await rtlPreview.evaluate(e=>e.scrollWidth<=e.clientWidth),true);
+            await rtlAdmin.close();
+            console.log('PASS: representative RTL mobile admin appearance preview and responsive embedded state');
             await rtl.close();
         }
     } finally { await browser.close(); }

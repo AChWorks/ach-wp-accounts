@@ -57,7 +57,7 @@ final class EmailRecovery
 
     public static function allow(mixed $allow, int $userId): mixed
     {
-        if ($allow !== true || !self::managed($userId)) {
+        if ($allow !== true || NativeAccess::checkingMobileReset() || !self::managed($userId)) {
             return $allow;
         }
         $user = get_userdata($userId);
@@ -80,6 +80,7 @@ final class EmailRecovery
     /** Request a native-account email confirmation, never a login token. */
     public static function request(string $email): array
     {
+        if (!Settings::flag('allow_recovery_email_enrollment')) { throw new VerificationError('method_disabled'); }
         $user = self::requireAuthority();
         $email = trim($email);
         // Match the actual native users.user_email storage width.
@@ -138,7 +139,7 @@ final class EmailRecovery
     public static function confirm(#[\SensitiveParameter] string $token): void
     {
         $id = get_current_user_id();
-        if (!Lifecycle::ready() || !self::managed($id) || SessionProof::currentToken($id)==='' ||
+        if (!Settings::flag('allow_recovery_email_enrollment') || !Lifecycle::ready() || !self::managed($id) || SessionProof::currentToken($id)==='' ||
             !preg_match('/\\A[0-9a-f]{64}\\z/D',$token)) {
             throw new VerificationError('invalid_context');
         }
@@ -283,6 +284,7 @@ final class EmailRecovery
     /** Set an optional native password with fresh possession proof. */
     public static function password(#[\SensitiveParameter] string $password, #[\SensitiveParameter] string $confirmation): array
     {
+        if (!Settings::flag('allow_recovery_password_enrollment')) { throw new VerificationError('method_disabled'); }
         $user = self::requireAuthority();
         // The optional password is a single-factor credential: use a meaningful
         // length floor without composition restrictions (native login stays intact).

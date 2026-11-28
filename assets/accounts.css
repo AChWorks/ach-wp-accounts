@@ -1,141 +1,173 @@
-/* Scoped styles: use the site's typography and ordinary button theme. */
+/* Layout and semantic component states; theme styling wins unless an explicit
+   local override is configured. No global theme reset. */
 .ach-accounts {
-    box-sizing: border-box;
-    inline-size: min(100%, 28rem);
-    margin-block: 1rem;
-    padding: clamp(1rem, 3vw, 1.5rem);
-    border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
-    border-radius: .75rem;
-    font-family: inherit;
-    text-align: start;
-}
-.ach-accounts [hidden],
-.ach-accounts-dialog[hidden] { display: none !important; }
-.ach-accounts h2 { margin-block: 0 .75rem; font-size: 1.2em; }
-.ach-accounts p { margin-block: .5rem; }
-.ach-accounts form { margin: .75rem 0 0; padding: 0; border: 0; box-shadow: none; background: transparent; }
-.ach-accounts label { display: block; margin-block: .5rem .25rem; }
-.ach-accounts input {
-    box-sizing: border-box;
-    inline-size: 100%;
-    min-block-size: 2.75rem;
-    margin-block-end: .75rem;
-    font: inherit;
-}
-.ach-accounts input[dir="ltr"] { text-align: center; font-variant-numeric: tabular-nums; }
-.ach-accounts [data-ach-code] { letter-spacing: .35em; }
-.ach-accounts .ach-accounts-primary { inline-size: 100%; min-block-size: 2.75rem; font: inherit; }
-.ach-accounts .ach-accounts-actions { display: flex; justify-content: space-between; gap: .5rem; flex-wrap: wrap; margin-block: .5rem; }
-.ach-accounts .ach-accounts-link,
-.ach-accounts-dialog .ach-accounts-link {
-    border: 0; padding: .3rem 0; background: transparent; color: inherit;
-    font: inherit; text-decoration: underline; text-underline-offset: .2em; cursor: pointer;
-}
-.ach-accounts button:disabled { cursor: not-allowed; opacity: .6; }
-.ach-accounts .ach-accounts-native { display: block; margin-block-start: .75rem; }
-.ach-accounts [data-ach-status]:empty { display: none; }
-.ach-accounts [data-ach-status][data-error="1"] { border-inline-start: .2rem solid currentColor; padding-inline-start: .5rem; }
-.ach-accounts :focus-visible,
-.ach-accounts-dialog :focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
-.ach-accounts-dialog { max-inline-size: calc(100vw - 2rem); max-block-size: calc(100vh - 2rem); border-radius: .75rem; padding: 1rem; }
-.ach-accounts-dialog::backdrop { background: rgba(0, 0, 0, .45); }
-.ach-accounts-dialog .ach-accounts { border: 0; padding: .5rem; margin: 0; }
-.login #login .ach-accounts { background: #fff; color: #1d2327; margin-block-end: 1rem; }
-.login #login .ach-accounts .ach-accounts-primary { background: #2271b1; color: #fff; }
-
-.ach-accounts-recovery { margin-block-start: 1rem; border-block-start: 1px solid color-mix(in srgb, currentColor 18%, transparent); padding-block-start: .75rem; }
-.ach-accounts-recovery summary { cursor: pointer; font-weight: 600; }
-.ach-accounts-recovery form + form { margin-block-start: 1.5rem; }
-
-/* Standalone auth document; no dependence on the active theme's form styles. */
-body.ach-auth-body {
-    --ach-ink: #182330;
-    --ach-muted: #526071;
-    --ach-border: #d6dce4;
-    --ach-accent: #135e96;
-    margin: 0;
-    background: #f4f6f9;
-    color: var(--ach-ink);
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    line-height: 1.65;
-    min-block-size: 100vh;
-}
-.ach-auth-page, .ach-auth-page * { box-sizing: border-box; }
-.ach-auth-page {
-    display: grid;
-    align-items: center;
-    justify-items: center;
-    min-block-size: 100vh;
-    padding: clamp(.75rem, 4vw, 2rem);
-}
-.ach-auth-shell {
-    inline-size: min(100%, 27rem);
-    padding: clamp(1.1rem, 5vw, 2rem);
-    background: #fff;
-    border: 1px solid var(--ach-border);
-    border-radius: 1rem;
-    box-shadow: 0 12px 40px rgba(20, 35, 55, .07);
-}
-.ach-auth-brand { display: flex; align-items: center; gap: 1rem; margin-block-end: 1.5rem; }
-.ach-auth-brand a { color: var(--ach-ink); text-decoration: none; }
-.ach-auth-back { display: grid; place-items: center; inline-size: 2.5rem; block-size: 2.5rem; border: 1px solid var(--ach-border); border-radius: .5rem; }
-[dir="rtl"] .ach-auth-back span { transform: scaleX(-1); }
-.ach-auth-logo { flex: 1; min-inline-size: 0; font-size: 1.15rem; font-weight: 700; overflow-wrap: anywhere; }
-.ach-auth-image { max-inline-size: 100%; max-block-size: 3rem; inline-size: auto; block-size: auto; object-fit: contain; }
-.ach-auth-shell .ach-accounts { inline-size: 100%; border: 0; padding: 0; margin: 0; }
-.ach-auth-shell .ach-accounts h2 { color: var(--ach-ink); font: inherit; font-size: 1.4rem; font-weight: 700; }
-.ach-auth-shell .ach-accounts p { color: var(--ach-muted); }
-.ach-auth-shell .ach-accounts form { margin: 1rem 0 0; padding: 0; border: 0; }
-.ach-accounts input:not([type="hidden"]) {
-    border: 1px solid #aab6c4;
-    border-radius: .55rem;
-    background: #fff;
-    color: #182330;
-    padding: .65rem .85rem;
-    box-shadow: none;
-}
-.ach-accounts .ach-accounts-primary {
-    border: 1px solid transparent;
-    border-radius: .55rem;
-    padding: .65rem 1rem;
-    background: #135e96;
-    color: #fff;
-    font-weight: 650;
-    cursor: pointer;
-    text-decoration: none;
-    box-shadow: none;
-}
-.ach-accounts .ach-accounts-primary:not(:disabled):hover { background: #104d7c; color: #fff; }
-.ach-accounts .ach-accounts-primary:disabled { background: #536c81; color: #fff; opacity: 1; }
-.ach-accounts [aria-busy="true"] .ach-accounts-primary { cursor: wait; }
-.ach-auth-methods, .ach-auth-legal {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .65rem 1rem;
-    margin-block-start: 1.25rem;
-    padding-block-start: 1rem;
-    border-block-start: 1px solid var(--ach-border);
-    font-size: .9rem;
-}
-.ach-auth-shell a:not(.ach-auth-logo, .ach-auth-back) { color: var(--ach-accent); text-underline-offset: .2em; }
-.ach-auth-shell :focus-visible { outline: 2px solid var(--ach-accent); outline-offset: 3px; }
-.ach-auth-message, .ach-auth-shell [data-ach-status][data-error="1"] {
-    background: #fef2f2;
-    border-inline-start: 3px solid #b42318;
-    color: #8a211b;
-    padding: .75rem;
-    border-radius: .4rem;
+    box-sizing: border-box; min-inline-size: 0; max-inline-size: 100%;
+    inline-size: min(100%, 28rem); margin-block: 1rem;
+    padding: clamp(1rem,3vw,1.5rem); border: 1px solid color-mix(in srgb,currentColor 18%,transparent);
+    border-radius: var(--ach-radius,.75rem); font-family: var(--ach-font,inherit); text-align: start;
     overflow-wrap: anywhere;
 }
-.ach-accounts[hidden] { display: none !important; }
-.ach-checkout-verification {
-    inline-size: 100%;
-    margin-block: 1rem;
-    background: #fff;
-    color: #182330;
-    border: 1px solid #b8c5d3;
-    scroll-margin-block: 1rem;
+.ach-accounts *, .ach-accounts *::before, .ach-accounts *::after { box-sizing: border-box; }
+.ach-accounts [hidden], .ach-accounts[hidden], .ach-accounts-dialog[hidden], .ach-auth-shell [hidden] { display:none!important; }
+.ach-accounts h2 { margin-block:0 .65rem; font-size:1.2em; line-height:1.5; }
+.ach-accounts p { margin-block:.5rem; }
+.ach-accounts form { margin:.75rem 0 0; padding:0; border:0; box-shadow:none; background:transparent; }
+.ach-accounts label { display:block; margin-block:.5rem .3rem; font:inherit; font-weight:500; }
+.ach-accounts input:not([type="hidden"]):not([type="checkbox"]) {
+    inline-size:100%; max-inline-size:100%; min-inline-size:0;
+    min-block-size:2.75rem; margin-block-end:.75rem; font:inherit;
 }
-.ach-checkout-verification [data-ach-form] { margin-block: .75rem; }
-.ach-checkout-verification [data-ach-status] { overflow-wrap: anywhere; }
-.ach-checkout-verification [data-error="1"] { color: #a1261a; }
+:where(.ach-accounts input:not([type="hidden"]):not([type="checkbox"])) {
+    border:1px solid #aab6c4; border-radius:var(--ach-radius,.5rem);
+    background:#fff; color:#182330; padding:.65rem .8rem; box-shadow:none;
+}
+.ach-accounts input[dir="ltr"] { text-align:center; font-variant-numeric:tabular-nums; }
+.ach-accounts [data-ach-code] { letter-spacing:.28em; }
+.ach-accounts .ach-accounts-primary {
+    display:block; inline-size:100%; max-inline-size:100%; min-block-size:2.75rem;
+    font:inherit; font-weight:600; text-align:center; white-space:normal;
+}
+:where(.ach-accounts .ach-accounts-primary) {
+    border:1px solid transparent; border-radius:var(--ach-radius,.5rem); padding:.65rem 1rem;
+    background:#135e96; color:#fff; cursor:pointer; box-shadow:none;
+}
+.ach-auth-shell .ach-accounts .ach-accounts-primary {
+    border-radius:var(--ach-radius,.5rem);
+}
+.ach-accounts .ach-accounts-primary:not(:disabled):hover { filter:brightness(.94); }
+.ach-accounts .ach-accounts-primary:disabled { cursor:not-allowed; opacity:.72; }
+.ach-accounts [aria-busy="true"] .ach-accounts-primary { cursor:wait; }
+.ach-accounts .ach-accounts-actions {
+    display:flex; flex-wrap:wrap; justify-content:space-between; gap:.5rem; margin-block:.35rem;
+}
+.ach-accounts button.ach-accounts-link, .ach-accounts-dialog button.ach-accounts-link {
+    appearance:none; display:inline-block; width:auto; min-width:0; min-block-size:2.5rem;
+    border:0; border-radius:0; margin:0; padding:.35rem 0;
+    background:transparent; box-shadow:none; color:inherit; font:inherit; line-height:1.5;
+    text-decoration:underline; text-underline-offset:.2em; text-transform:none; cursor:pointer;
+}
+.ach-accounts button.ach-accounts-link:hover, .ach-accounts button.ach-accounts-link:focus,
+.ach-accounts-dialog button.ach-accounts-link:hover, .ach-accounts-dialog button.ach-accounts-link:focus {
+    background:transparent; border:0; box-shadow:none; color:inherit;
+}
+.ach-accounts button.ach-accounts-link:disabled,
+.ach-accounts-dialog button.ach-accounts-link:disabled { opacity:.65; cursor:not-allowed; }
+.ach-accounts .ach-accounts-native { display:block; margin-block-start:.65rem; overflow-wrap:anywhere; }
+.ach-accounts [data-ach-status]:empty { display:none; }
+.ach-accounts [data-ach-status][data-error="1"] {
+    border-inline-start:.2rem solid #b42318; padding-inline-start:.65rem; overflow-wrap:anywhere;
+}
+.ach-accounts :focus-visible, .ach-accounts-dialog :focus-visible, .ach-auth-shell :focus-visible {
+    outline:2px solid var(--ach-accent,currentColor); outline-offset:3px;
+}
+.ach-accounts-dialog {
+    max-inline-size:min(28rem,calc(100vw - 2rem)); max-block-size:calc(100vh - 2rem);
+    border:1px solid color-mix(in srgb,currentColor 18%,transparent);
+    border-radius:var(--ach-radius,.75rem); padding:1rem; overflow:auto;
+}
+/* Without native top-layer support, use a real in-flow disclosure.
+   An absolutely positioned nonmodal dialog can be covered by theme content. */
+.ach-accounts-dialog:not([open]) { display:none; }
+.ach-accounts-dialog[data-ach-popup-fallback][open] {
+    position:relative; inset:auto; display:block; box-sizing:border-box;
+    inline-size:min(100%,28rem); max-inline-size:100%; max-block-size:none;
+    margin:1rem 0;
+}
+.ach-accounts-dialog::backdrop { background:rgba(0,0,0,.45); }
+.ach-accounts-dialog .ach-accounts { border:0; padding:.5rem; margin:0; inline-size:100%; }
+.ach-accounts-recovery { margin-block-start:1rem; border-block-start:1px solid color-mix(in srgb,currentColor 18%,transparent); padding-block-start:.75rem; }
+.ach-accounts-recovery summary { cursor:pointer; font-weight:600; }
+.ach-accounts-recovery form + form { margin-block-start:1.25rem; }
+.ach-accounts[data-surface="profile"] {
+    inline-size:100%; padding:1rem 0; border:0;
+    border-block-end:1px solid color-mix(in srgb,currentColor 18%,transparent); border-radius:0;
+}
+.ach-accounts[data-surface="profile"] [data-ach-current] {
+    display:inline-flex; align-items:center; gap:.5rem; margin-inline-end:1rem; font-weight:600;
+}
+.ach-accounts [data-ach-identity-icon][data-verified="1"], .ach-success-mark { color:#13784b; }
+.ach-accounts [data-ach-identity-icon][data-verified="0"] { color:#995900; }
+.ach-accounts [data-ach-success] { display:grid; justify-items:center; text-align:center; gap:.5rem; padding:1.25rem .5rem; }
+.ach-success-mark {
+    display:grid; place-items:center; inline-size:3.25rem; block-size:3.25rem;
+    border:2px solid currentColor; border-radius:50%; font-size:1.8rem; line-height:1;
+}
+
+/* Standalone shell: fallback styles only. Site typography can override the
+   document root, or a locally configured font may be inherited explicitly. */
+html.ach-auth-document { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
+body.ach-auth-body {
+    margin:0; min-block-size:100vh; line-height:1.65;
+    background:var(--ach-page,#f6f7f9);
+    color:var(--wp--preset--color--contrast,#182330);
+}
+.ach-auth-page, .ach-auth-page * { box-sizing:border-box; }
+.ach-auth-page {
+    display:grid; align-items:center; justify-items:center; min-block-size:100vh;
+    padding:clamp(.75rem,4vw,2rem);
+}
+.ach-auth-shell {
+    inline-size:min(100%,26.5rem); min-inline-size:0;
+    padding:clamp(1.25rem,5vw,2rem); background:var(--wp--preset--color--base,#fff);
+    color:var(--wp--preset--color--contrast,#182330);
+    border:1px solid color-mix(in srgb,currentColor 16%,transparent);
+    border-radius:var(--ach-radius,1rem); box-shadow:0 10px 35px #14233709;
+    overflow-wrap:anywhere;
+}
+.ach-auth-brand {
+    display:grid; grid-template-columns:2.75rem minmax(0,1fr) 2.75rem;
+    align-items:center; gap:.5rem; margin-block-end:1.5rem;
+}
+.ach-auth-brand a { color:inherit; text-decoration:none; }
+.ach-auth-back {
+    display:grid; place-items:center; inline-size:2.75rem; block-size:2.75rem;
+    border:0; background:transparent; box-shadow:none; font-size:1.45rem;
+}
+[dir="rtl"] .ach-auth-back span { transform:scaleX(-1); }
+.ach-auth-logo { text-align:center; min-inline-size:0; font-weight:700; font-size:1.2em; }
+.ach-auth-image { max-inline-size:100%; max-block-size:3.5rem; inline-size:auto; block-size:auto; object-fit:contain; }
+.ach-auth-shell .ach-accounts { inline-size:100%; border:0; padding:0; margin:0; }
+.ach-auth-shell .ach-accounts h2 { font:inherit; font-size:1.35rem; line-height:1.5; font-weight:700; }
+.ach-auth-shell .ach-accounts p { margin-block:.5rem; }
+.ach-auth-shell .ach-accounts form { margin:1rem 0 0; padding:0; border:0; }
+.ach-auth-shell .ach-accounts input:not([type="hidden"]):not([type="checkbox"]) {
+    font:inherit; border-radius:var(--ach-radius,.5rem); max-inline-size:100%;
+}
+.ach-auth-methods, .ach-auth-legal {
+    display:flex; flex-wrap:wrap; justify-content:center; gap:.7rem 1rem;
+    margin-block-start:1.25rem; padding-block-start:1rem;
+    border-block-start:1px solid color-mix(in srgb,currentColor 15%,transparent); font-size:.92em;
+}
+.ach-auth-methods a { text-align:center; }
+.ach-auth-shell a:not(.ach-auth-logo,.ach-auth-back) { color:inherit; text-decoration:underline; text-underline-offset:.2em; }
+.ach-auth-message, .ach-auth-shell [data-ach-status][data-error="1"] {
+    background:#fef2f2; border-inline-start:3px solid #b42318; color:#8a211b;
+    padding:.75rem; border-radius:.4rem; overflow-wrap:anywhere;
+}
+.ach-auth-notice { border-inline-start:3px solid #13784b; padding-inline-start:.65rem; }
+
+/* Checkout is a local full-width native-flow child, never an independent
+   floating card or nested form. Classic anchor remains outside WC fragments;
+   Blocks adapter remains outside React-owned content. */
+.ach-accounts.ach-checkout-verification {
+    inline-size:100%; max-inline-size:100%; min-inline-size:0; clear:both;
+    grid-column:1/-1; flex:1 1 100%; align-self:start;
+    margin-block:1rem; padding:clamp(.75rem,2vw,1rem);
+    border:1px solid color-mix(in srgb,currentColor 20%,transparent); scroll-margin-block:1rem;
+}
+.ach-checkout-verification [data-ach-form] { margin-block:.75rem; }
+.ach-checkout-verification [data-ach-status] { overflow-wrap:anywhere; }
+.ach-checkout-verification [data-error="1"] { color:inherit; }
+@media(max-width:420px) {
+    .ach-auth-page { align-items:start; padding-block-start:clamp(1rem,9vh,4rem); }
+    .ach-auth-shell { padding:1.15rem; }
+}
+@media(prefers-reduced-motion:reduce) {
+    .ach-accounts *, .ach-auth-shell * { scroll-behavior:auto!important; }
+}
+
+.ach-accounts .ach-accounts-remember { display:flex; align-items:center; gap:.5rem; }
+.ach-accounts .ach-accounts-remember input { inline-size:auto; min-block-size:auto; margin:0; }
+
+.ach-auth-shell .ach-auth-methods { flex-direction:column; align-items:center; }
+.ach-auth-shell .ach-auth-back, .ach-auth-shell .ach-auth-back:hover { border:0; background:transparent; box-shadow:none; }

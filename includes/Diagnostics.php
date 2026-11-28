@@ -77,7 +77,7 @@ final class Diagnostics
     public static function accountFailure(string $code, string $operation): void
     {
         if (!in_array($code, ['registration_pending', 'storage_unavailable', 'authentication_unavailable'], true) ||
-            !in_array($operation, ['start', 'issue', 'complete', 'recovery_email', 'recovery_password'], true)) {
+            !in_array($operation, ['start', 'issue', 'complete', 'continue_registration', 'reset_password', 'recovery_email', 'recovery_password'], true)) {
             return;
         }
         try {
@@ -173,7 +173,7 @@ final class Diagnostics
             'category' => ['sms','connection','account'],
             'provider' => array_column(ProviderRegistry::capabilities(), 'id'),
             'state' => ['accepted','failed','uncertain'],
-            'purpose' => ['login','link','step_up','test_login','test_link','test_step_up','start','issue','complete','recovery_email','recovery_password'],
+            'purpose' => ['login','link','step_up','password_reset','test_login','test_link','test_step_up','test_password_reset','start','issue','complete','continue_registration','reset_password','recovery_email','recovery_password'],
         ];
         foreach ($enums as $key => $values) {
             if (isset($input[$key])) {

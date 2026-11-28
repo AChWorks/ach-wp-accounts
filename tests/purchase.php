@@ -1,5 +1,5 @@
 <?php
-use ACh\WPAccounts\{AccountFlow,Identity,Settings,SessionProof,CheckoutGate,SmsSender,SendResult,Verification};
+use ACh\WPAccounts\{AccountFlow,Identity,Settings,SessionProof,CheckoutGate,MobileCodeDelivery,SendResult,Verification};
 $root=getenv('ACH_TEST_WP');
 $dir=getenv('ACH_TEST_DIR');
 if (!$root || !$dir) { throw new RuntimeException('Run isolated fixture.'); }
@@ -30,7 +30,7 @@ final class PurchaseFixtureGateway extends WC_Payment_Gateway {
     }
 }
 add_filter('woocommerce_payment_gateways',static fn($gateways)=>[PurchaseFixtureGateway::class]);
-final class PurchaseFixtureSender implements SmsSender {
+final class PurchaseFixtureSender implements MobileCodeDelivery {
     public string $code='';
     public int $calls=0;
     public function id():string {return 'fixture';}
