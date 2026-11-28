@@ -71,7 +71,7 @@ if ($mode==='token-fixture') {
         $token->set_last4($last4);
         $token->set_expiry_month('12');
         $token->set_expiry_year('2035');
-        $token->set_is_default($last4==='1111');
+        $token->set_default($last4==='1111');
         $ids[]=$token->save();
     }
     echo wp_json_encode($ids);

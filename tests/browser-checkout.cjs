@@ -310,6 +310,11 @@ async function tokenPaid(page,button,email,expectedToken,save=false,id=0) {
         const blockButton='.wc-block-components-checkout-place-order-button';
         const savedSelector=id=>'input[id^="radio-control-wc-payment-method-saved-tokens"][value="'+id+'"]';
         await tokenPage.locator(blockButton).waitFor({state:'visible',timeout:30000});
+        // Logged-in customers with a populated address use Woo's collapsed
+        // address card. Open its native editor, not hidden controls.
+        if (!await tokenPage.locator('#billing-country').isVisible()) {
+            await tokenPage.locator('[aria-label="Edit billing address"]').click();
+        }
         await tokenPage.locator('#billing-country').selectOption('US');
         await tokenPage.locator('#billing-state').selectOption('CA');
         tokenEmail='block-token@example.invalid';
