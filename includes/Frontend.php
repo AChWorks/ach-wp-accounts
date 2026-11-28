@@ -6,14 +6,9 @@ defined('ABSPATH') || exit;
 /** One presentation adapter for native login, account, checkout and shortcodes. */
 final class Frontend
 {
-    private const NATIVE = 'ach_accounts_native';
-    private const RETURN = 'ach_accounts_return';
-
     public static function hooks(): void
     {
         add_action('init', [self::class, 'register']);
-        add_action('login_enqueue_scripts', [self::class, 'loginAssets']);
-        add_filter('login_message', [self::class, 'loginMessage']);
         add_action('wp_enqueue_scripts', [self::class, 'pageAssets']);
         add_action('admin_enqueue_scripts', static function (string $hook): void {
             if ($hook === 'profile.php' && BrowserApi::enabled()) {
@@ -22,12 +17,7 @@ final class Frontend
         });
         add_action('admin_footer-profile.php', [self::class, 'profile']);
         add_action('template_redirect', [self::class, 'protectCheckout'], 0);
-        add_action('woocommerce_before_customer_login_form', [self::class, 'myAccount']);
         add_action('woocommerce_before_edit_account_form', [self::class, 'profile']);
-        add_action('woocommerce_login_form_end', [self::class, 'nativeReturn']);
-        add_action('woocommerce_register_form_end', [self::class, 'nativeReturn']);
-        add_filter('pre_do_shortcode_tag', [self::class, 'checkoutShortcode'], 10, 4);
-        add_filter('pre_render_block', [self::class, 'checkoutBlock'], 10, 2);
     }
 
     public static function register(): void
@@ -39,26 +29,13 @@ final class Frontend
         wp_register_script('ach-wp-accounts', $base . 'assets/accounts.js', [], (string) filemtime(dirname(__DIR__) . '/assets/accounts.js'), true);
     }
 
-    private static function assets(): void
+    public static function assets(): void
     {
         wp_enqueue_style('ach-wp-accounts');
         wp_enqueue_script('ach-wp-accounts');
     }
 
-    public static function nativeRequested(): bool
-    {
-        return isset($_GET[self::NATIVE]) && $_GET[self::NATIVE] === '1';
-    }
-
-    private static function accountUrl(): string
-    {
-        if (function_exists('wc_get_page_id') && wc_get_page_id('myaccount') > 0) {
-            return wc_get_page_permalink('myaccount');
-        }
-        return wp_login_url();
-    }
-
-    private static function defaultRedirect(): string
+    public static function defaultRedirect(): string
     {
         return function_exists('wc_get_page_id') && wc_get_page_id('myaccount') > 0
             ? wc_get_page_permalink('myaccount') : home_url('/');
@@ -90,57 +67,10 @@ final class Frontend
         return $safe;
     }
 
-    private static function currentUrl(): string
+    public static function currentUrl(): string
     {
         $uri = $_SERVER['REQUEST_URI'] ?? '';
         return self::localUrl(is_string($uri) ? wp_unslash($uri) : '', self::defaultRedirect());
-    }
-
-    private static function redirectParam(string $key, string $fallback): string
-    {
-        $value = $_GET[$key] ?? '';
-        return self::localUrl(is_string($value) ? wp_unslash($value) : '', $fallback);
-    }
-
-    private static function normalLogin(): bool
-    {
-        global $action, $interim_login;
-        // Keep native recovery, reauth, post-password, application-password,
-        // admin confirmation and failed native credential attempts untouched.
-        return BrowserApi::enabled() && !self::nativeRequested() &&
-            ($action ?? 'login') === 'login' && !$interim_login &&
-            empty($_REQUEST['reauth']) && empty($_REQUEST['interim-login']) &&
-            empty($_GET['checkemail']) && empty($_GET['registration']) &&
-            ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' &&
-            !str_contains(self::redirectParam('redirect_to', ''), 'authorize-application.php');
-    }
-
-    public static function loginAssets(): void
-    {
-        $return = self::redirectParam('redirect_to', '');
-        $query = wp_parse_url($return, PHP_URL_QUERY);
-        if (is_string($query)) {
-            parse_str($query,$params);
-            if (isset($params[EmailRecovery::QUERY]) || isset($params['newuseremail'])) {
-                nocache_headers();
-                if (!headers_sent()) {
-                    header('Referrer-Policy: no-referrer', true);
-                }
-            }
-        }
-        if (self::normalLogin()) {
-            self::assets();
-        }
-    }
-
-    public static function loginMessage(string $message): string
-    {
-        if (!self::normalLogin()) {
-            return $message;
-        }
-        $return = self::redirectParam('redirect_to', self::defaultRedirect());
-        $native = add_query_arg(self::NATIVE, '1', wp_login_url($return));
-        return $message . self::render('wp', 'login', $return, $native, 'core');
     }
 
     public static function pageAssets(): void
@@ -159,33 +89,7 @@ final class Frontend
 
     private static function nativeAccountUrl(string $return): string
     {
-        if (function_exists('wc_get_page_id') && wc_get_page_id('myaccount') > 0 &&
-            (get_option('woocommerce_enable_myaccount_registration') === 'yes' || !get_option('users_can_register'))) {
-            return add_query_arg([self::NATIVE => '1', self::RETURN => $return], self::accountUrl());
-        }
-        return add_query_arg(self::NATIVE, '1', wp_login_url($return));
-    }
-
-    public static function nativeReturn(): void
-    {
-        if (!self::nativeRequested()) {
-            return;
-        }
-        $return = self::redirectParam(self::RETURN, '');
-        if ($return !== '') {
-            // Native WC handlers read this field, validate and apply their own
-            // redirect filters after actual login or registration.
-            printf('<input type="hidden" name="redirect" value="%s">', esc_attr($return));
-        }
-    }
-
-    public static function myAccount(): void
-    {
-        if (BrowserApi::enabled() && !self::nativeRequested() && !is_user_logged_in() &&
-            ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
-            $return = self::redirectParam(self::RETURN, self::defaultRedirect());
-            echo self::render('account', 'login', $return, self::nativeAccountUrl($return), 'commerce');
-        }
+        return AuthPage::secondaryUrl($return);
     }
 
     public static function profile(): void
@@ -234,7 +138,7 @@ final class Frontend
 
     public static function protectCheckout(): void
     {
-        if (self::checkoutSurface() || (self::nativeRequested() && self::redirectParam(self::RETURN, '') !== '')) {
+        if (self::checkoutSurface()) {
             // Qualified and unqualified HTML differ. Do not allow a shared
             // page cache to store either version or an order key.
             if (!defined('DONOTCACHEPAGE')) {
@@ -247,29 +151,8 @@ final class Frontend
         }
     }
 
-    private static function checkoutForm(): string
-    {
-        $return = self::currentUrl();
-        return self::render('checkout', 'checkout', $return, self::nativeAccountUrl($return));
-    }
-
-    public static function checkoutShortcode(mixed $pre, string $tag, mixed $attrs, array $match): mixed
-    {
-        return $pre === false && $tag === 'woocommerce_checkout' && self::checkoutSurface() && CheckoutGate::blocked()
-            ? self::checkoutForm() : $pre;
-    }
-
-    public static function checkoutBlock(mixed $pre, array $block): mixed
-    {
-        $name = $block['blockName'] ?? '';
-        $checkout = $name === 'woocommerce/checkout' ||
-            ($name === 'woocommerce/classic-shortcode' && ($block['attrs']['shortcode'] ?? '') === 'checkout');
-        return $pre === null && $checkout && self::checkoutSurface() && CheckoutGate::blocked()
-            ? self::checkoutForm() : $pre;
-    }
-
     /** Static form shell: no account identity, nonce, OTP or proof in cacheable HTML. */
-    public static function render(string $context, string $surface, string $return, string $native, string $nativeTarget = ''): string
+    public static function render(string $context, string $surface, string $return, string $native, string $checkoutKind = ''): string
     {
         self::assets();
         $enabled = BrowserApi::enabled();
@@ -304,20 +187,24 @@ final class Frontend
             'password_mismatch' => __('Passwords do not match.', 'ach-wp-accounts'),
             'manage_email' => __('Use the optional recovery options to add or change your email.', 'ach-wp-accounts'),
             'continue_checkout' => __('Continue checkout', 'ach-wp-accounts'),
+            'verify_pay' => __('Verify and continue to payment', 'ach-wp-accounts'),
+            'checkout_confirmed' => __('Mobile verified. Review your order and select Pay to continue.', 'ach-wp-accounts'),
+            'checkout_changed' => __('Your checkout has changed. Review your order and select Pay again.', 'ach-wp-accounts'),
+            'checkout_mismatch' => __('Use the mobile number linked to your account, or manage your account mobile number first.', 'ach-wp-accounts'),
+            'checkout_mobile_required' => __('Enter a valid mobile number before payment.', 'ach-wp-accounts'),
+            'checkout_refresh_failed' => __('Mobile verified, but checkout could not be refreshed. Select Pay to try again.', 'ach-wp-accounts'),
+            'cancel_verification' => __('Cancel verification', 'ach-wp-accounts'),
+            'checking' => __('Checking…', 'ach-wp-accounts'),
         ];
         $id = wp_unique_id('ach-accounts-');
         $title = $surface === 'checkout' ? __('Verify your mobile to continue checkout', 'ach-wp-accounts')
             : ($surface === 'profile' ? __('Mobile number', 'ach-wp-accounts') : __('Sign in', 'ach-wp-accounts'));
-        $nativeLabel = (($context === 'wp' && get_option('users_can_register')) ||
-            ($context !== 'wp' && (get_option('woocommerce_enable_myaccount_registration') === 'yes' || get_option('users_can_register'))))
-            ? __('Sign in or register with email', 'ach-wp-accounts')
-            : __('Sign in with email or username', 'ach-wp-accounts');
+        $nativeLabel = NativeAccess::passwordAllowed() ? __('Sign in with email or username', 'ach-wp-accounts') : __('Register with email', 'ach-wp-accounts');
         ob_start();
         ?>
-        <section class="ach-accounts" data-ach-accounts data-context="<?php echo esc_attr($context); ?>"
+        <section class="ach-accounts<?php echo $checkoutKind !== '' ? ' ach-checkout-verification' : ''; ?>" data-ach-accounts<?php if ($checkoutKind !== ''): ?> data-checkout-kind="<?php echo esc_attr($checkoutKind); ?>" hidden<?php endif; ?> data-context="<?php echo esc_attr($context); ?>"
             data-surface="<?php echo esc_attr($surface); ?>" data-endpoint="<?php echo esc_url(admin_url('admin-ajax.php', 'https')); ?>"
             data-return="<?php echo esc_url(self::localUrl($return, self::defaultRedirect())); ?>"
-            data-native-target="<?php echo esc_attr($nativeTarget); ?>"
             data-enabled="<?php echo $enabled ? '1' : '0'; ?>"
             data-strings="<?php echo esc_attr(wp_json_encode($strings)); ?>" aria-labelledby="<?php echo esc_attr($id . '-title'); ?>">
             <h2 id="<?php echo esc_attr($id . '-title'); ?>" data-ach-title><?php echo esc_html($title); ?></h2>
@@ -327,7 +214,7 @@ final class Frontend
             <?php if (!$enabled): ?>
                 <p><?php echo esc_html($strings['unavailable']); ?></p>
             <?php endif; ?>
-            <form method="post" data-ach-form hidden>
+            <?php if ($checkoutKind !== ''): ?><div data-ach-form hidden><?php else: ?><form method="post" data-ach-form hidden><?php endif; ?>
                 <div data-ach-mobile-field>
                     <label for="<?php echo esc_attr($id . '-mobile'); ?>"><?php esc_html_e('Mobile number', 'ach-wp-accounts'); ?></label>
                     <input id="<?php echo esc_attr($id . '-mobile'); ?>" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" data-ach-mobile>
@@ -341,20 +228,20 @@ final class Frontend
                     <input id="<?php echo esc_attr($id . '-code'); ?>" type="text" inputmode="numeric" autocomplete="one-time-code" dir="ltr" maxlength="6" data-ach-code disabled>
                     <p><bdi dir="ltr" data-ach-masked></bdi></p>
                 </div>
-                <button type="submit" class="button ach-accounts-primary" data-ach-submit><?php echo esc_html($strings['send']); ?></button>
+                <button type="<?php echo $checkoutKind !== '' ? 'button' : 'submit'; ?>" class="ach-accounts-primary" data-ach-submit><?php echo esc_html($strings['send']); ?></button>
                 <div class="ach-accounts-actions">
                     <button type="button" class="ach-accounts-link" data-ach-edit hidden><?php echo esc_html($strings['edit']); ?></button>
                     <button type="button" class="ach-accounts-link" data-ach-resend hidden><?php echo esc_html($strings['resend']); ?></button>
                 </div>
-            </form>
+            <?php if ($checkoutKind !== ''): ?></div><button type="button" class="ach-accounts-link" data-ach-cancel><?php esc_html_e('Cancel verification','ach-wp-accounts'); ?></button><?php else: ?></form><?php endif; ?>
             <button type="button" class="ach-accounts-link" data-ach-change hidden><?php echo esc_html($strings['change_mobile']); ?></button>
             <button type="button" class="ach-accounts-link" data-ach-password-change hidden><?php echo esc_html($strings['password_change']); ?></button>
             <button type="button" class="ach-accounts-link" data-ach-retry hidden><?php echo esc_html($strings['retry_status']); ?></button>
             <?php if ($native !== ''): ?>
                 <a class="ach-accounts-native" data-ach-native-link href="<?php echo esc_url($native); ?>"><?php echo esc_html($nativeLabel); ?></a>
-                <?php if ($surface === 'checkout' && function_exists('wc_get_page_id') && wc_get_page_id('myaccount') > 0): ?>
-                    <a class="ach-accounts-native" data-ach-profile-link hidden href="<?php echo esc_url(wc_get_account_endpoint_url('edit-account')); ?>"><?php esc_html_e('Manage your mobile number', 'ach-wp-accounts'); ?></a>
-                <?php endif; ?>
+            <?php endif; ?>
+            <?php if ($surface === 'checkout' && AuthPage::commerceAvailable()): ?>
+                <a class="ach-accounts-native" data-ach-profile-link hidden href="<?php echo esc_url(wc_get_account_endpoint_url('edit-account')); ?>"><?php esc_html_e('Manage your mobile number', 'ach-wp-accounts'); ?></a>
             <?php endif; ?>
             <?php if ($surface === 'profile'): ?>
                 <details class="ach-accounts-recovery" data-ach-recovery hidden>

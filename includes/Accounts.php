@@ -196,7 +196,7 @@ final class AccountPolicy
             throw new VerificationError('reauthentication_required');
         }
         self::reserveAccountAction('reauth', $userId, 10, 'reauthentication_unavailable');
-        $verified = wp_authenticate($user->user_login, $password);
+        $verified = NativeAccess::reauthenticate($user->user_login, $password);
         if (!$verified instanceof \WP_User || $verified->ID !== $userId) {
             throw new VerificationError('reauthentication_required');
         }

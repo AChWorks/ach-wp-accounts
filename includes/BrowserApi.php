@@ -114,7 +114,7 @@ final class BrowserApi
         }
     }
 
-    public static function status(string $context): array
+    public static function status(string $context, ?string $mobile = null): array
     {
         $id = get_current_user_id();
         if (!in_array($context, ['wp', 'account', 'checkout'], true)) {
@@ -124,7 +124,8 @@ final class BrowserApi
         $managed = EmailRecovery::managed($id);
         return [
             'authenticated' => $id > 0,
-            'qualified' => SessionProof::qualifies(),
+            'qualified' => $context === 'checkout' ? CheckoutGate::qualified($mobile) : SessionProof::qualifies(),
+            'phone_matches' => $identity === null || $mobile === null || $mobile === '' || CheckoutGate::matchesMobile($mobile),
             'recent_proof' => SessionProof::qualifies(SessionProof::LINK_FRESHNESS),
             'can_link' => $id > 0 && AccountPolicy::canLinkWithoutPassword($id, $identity),
             'registration_allowed' => $id === 0 && AccountPolicy::registrationAllowed($context),
@@ -171,16 +172,17 @@ final class BrowserApi
             $flow = new AccountFlow(new Verification(Settings::policy()));
             switch ($operation) {
                 case 'status':
-                    $result = self::status(self::input('context', 32));
+                    $result = self::status(self::input('context', 32),self::input('mobile',128,false));
                     break;
                 case 'start':
                     self::sender(); // Validate configured provider identity before creating a flow.
                     $purpose = self::input('purpose', 32);
-                    $mobile = $purpose === 'step_up'
-                        ? (Identity::byUser(get_current_user_id())->mobile ?? '')
-                        : self::input('mobile', 128);
+                    $context = self::input('context',32);
+                    $entered = self::input('mobile',128,$purpose !== 'step_up');
+                    $mobile = $purpose === 'step_up' && ($context !== 'checkout' || $entered === '')
+                        ? (Identity::byUser(get_current_user_id())->mobile ?? '') : $entered;
                     $ticket = $flow->start(
-                        self::browser(true), $mobile, $purpose, self::input('context', 32),
+                        self::browser(true), $mobile, $purpose, $context,
                         self::input('password', 4096, false)
                     );
                     $canonical = Mobile::normalize($mobile);
@@ -198,6 +200,24 @@ final class BrowserApi
                     $result = $flow->complete(
                         self::browser(false), self::input('ticket', 2048), self::input('code', 32)
                     );
+                    break;
+                case 'checkout_context':
+                    if (self::input('context',32) !== 'checkout' || !CheckoutGate::enabled() || !function_exists('WC') ||
+                        !CheckoutGate::qualified(self::input('mobile',128,false))) {
+                        throw new VerificationError('invalid_context');
+                    }
+                    // A separate request sees the actual newly established WP
+                    // cookie. Do not mint nonces against the previous guest.
+                    $result = [
+                        'checkout_nonce'=>wp_create_nonce('woocommerce-process_checkout'),
+                        'order_pay_nonce'=>wp_create_nonce('woocommerce-pay'),
+                        'update_order_review_nonce'=>wp_create_nonce('update-order-review'),
+                        'apply_coupon_nonce'=>wp_create_nonce('apply-coupon'),
+                        'remove_coupon_nonce'=>wp_create_nonce('remove-coupon'),
+                        'store_nonce'=>wp_create_nonce('wc_store_api'),
+                        'rest_nonce'=>wp_create_nonce('wp_rest'),
+                        'nonce_timestamp'=>time(),
+                    ];
                     break;
                 case 'recovery_email':
                     $result = EmailRecovery::request(self::input('email', 254));

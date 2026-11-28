@@ -257,23 +257,6 @@
             }
         }
 
-        function hideNative() {
-            if (root.dataset.nativeTarget === 'core') {
-                const native = document.getElementById('loginform');
-                if (native) native.hidden = true;
-            } else if (root.dataset.nativeTarget === 'commerce') {
-                // Do not hide unrecognized custom theme markup; preserve the
-                // native form if the expected WooCommerce containers differ.
-                const columns = document.getElementById('customer_login');
-                if (columns) {
-                    columns.hidden = true;
-                } else {
-                    const native = document.querySelector('form.woocommerce-form-login');
-                    if (native) native.hidden = true;
-                }
-            }
-        }
-
         function configureRecovery() {
             const recovery = get('recovery');
             if (!recovery || !model.authenticated || !model.managed_account) return;
@@ -368,7 +351,6 @@
                     mode(model.has_mobile ? 'step_up' : 'link');
                 } else if (surface !== 'profile') {
                     mode('login');
-                    hideNative();
                 }
             } catch (error) {
                 announce(error.message || strings.unavailable, true);

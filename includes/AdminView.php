@@ -136,6 +136,7 @@ final class AdminView
             'invalid_nonce' => __('This form expired. Reload the page before trying again.','ach-wp-accounts'),
             'provider_unconfigured' => __('Save a complete provider configuration before selecting or enabling it.','ach-wp-accounts'),
             'provider_invalid' => __('Check the provider credentials and the selected pattern or text configuration.','ach-wp-accounts'),
+            'password_login_required' => __('Enable mobile sign-in or keep password sign-in available to customers.','ach-wp-accounts'),
             'authentication_required' => __('Disable required mobile checkout before disabling mobile sign-in.','ach-wp-accounts'),
             'environment_unavailable' => __('Mobile sign-in requires a compatible HTTPS site origin and installed database schema.','ach-wp-accounts'),
             'woocommerce_unavailable' => __('WooCommerce must be active to enable this checkout requirement.','ach-wp-accounts'),
@@ -272,8 +273,10 @@ final class AdminView
         $draft = self::draft('general');
         self::startForm('general','general',$s);
         foreach ([
-            'auth_enabled'=>[__('Mobile sign-in','ach-wp-accounts'),__('Allow eligible accounts to sign in with an SMS code. Native password sign-in remains available.','ach-wp-accounts')],
+            'auth_enabled'=>[__('Mobile sign-in','ach-wp-accounts'),__('Allow eligible accounts to sign in with an SMS code.','ach-wp-accounts')],
             'allow_registration'=>[__('Mobile registration','ach-wp-accounts'),__('Allow mobile-based registration only where native site registration is enabled.','ach-wp-accounts')],
+            'allow_email_registration'=>[__('Email registration','ach-wp-accounts'),__('Allow native public email registration where the site permits it.','ach-wp-accounts')],
+            'allow_password_login'=>[__('Customer password sign-in','ach-wp-accounts'),__('Keep password sign-in available to ordinary customers. Administrators and other privileged accounts retain native access. Check access for customers without a mobile number before disabling.','ach-wp-accounts')],
             'checkout_required'=>[__('Require verified mobile at checkout','ach-wp-accounts'),__('Customers must verify their mobile before payment, regardless of their sign-in method.','ach-wp-accounts')],
         ] as $key=>[$label,$description]) {
             echo '<div class="ach-admin-setting">';
@@ -283,7 +286,7 @@ final class AdminView
         self::endForm(__('Save changes','ach-wp-accounts'));
         echo '</section><section class="ach-admin-panel">';
         self::title(__('Native site registration','ach-wp-accounts'));
-        self::paragraph(__('Email or username sign-in and native email registration remain governed by WordPress and WooCommerce.','ach-wp-accounts'));
+        self::paragraph(__('The selected account methods also respect native WordPress and WooCommerce registration settings.','ach-wp-accounts'));
         $rows = [__('WordPress registration','ach-wp-accounts')=>self::state((bool)get_option('users_can_register'))];
         if (function_exists('WC')) {
             $rows[__('WooCommerce My Account registration','ach-wp-accounts')] = self::state(get_option('woocommerce_enable_myaccount_registration')==='yes');

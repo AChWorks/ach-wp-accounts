@@ -25,6 +25,7 @@ function adminError(callable $fn,string $code): void {
     throw new RuntimeException('Expected admin error: '.$code);
 }
 function postAdmin(string $action,array $data=[]): array {
+    if ($action==='general') { $data += ['allow_email_registration'=>'1','allow_password_login'=>'1']; }
     return $data+['ach_action'=>$action,'revision'=>Settings::read()['revision'],
         '_ach_nonce'=>wp_create_nonce('ach_accounts_admin_'.$action)];
 }
