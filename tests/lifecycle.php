@@ -1,5 +1,5 @@
 <?php
-use ACh\WPAccounts\{AccountFlow,AccountPolicy,BrowserApi,CheckoutGate,EmailRecovery,Identity,Lifecycle,Migration,Privacy,RegistrationRecovery,Schema,SessionProof,Settings,SettingsError,VerificationError,SmsSender,SendResult};
+use ACh\WPAccounts\{AccountFlow,AccountPolicy,BrowserApi,CheckoutGate,EmailRecovery,Identity,Lifecycle,Migration,Privacy,RegistrationRecovery,Schema,SessionProof,Settings,SettingsError,VerificationError,MobileCodeDelivery,SendResult};
 
 $root=getenv('ACH_TEST_WP');
 $dir=getenv('ACH_TEST_DIR');
@@ -130,7 +130,7 @@ $wpdb->query("TRUNCATE TABLE ".Schema::table('limits')); // isolated fixture onl
 $legacyFlow=new AccountFlow();
 $legacyBrowser=bin2hex(random_bytes(32));
 $legacyTicket=$legacyFlow->start($legacyBrowser,$imported->mobile,'login','account');
-$legacySender=new class implements SmsSender {
+$legacySender=new class implements MobileCodeDelivery {
     public string $code='';
     public function id():string{return 'fixture';}
     public function send(string $mobile,string $code,string $purpose):SendResult{
@@ -266,7 +266,7 @@ lifeCheck(!is_wp_error($result) && Lifecycle::ready() && is_plugin_active($plugi
 wp_set_current_user($phoneOnly);
 lifeCheck(SessionProof::currentToken($phoneOnly)===$nativeToken && !SessionProof::qualifies(),'Reactivation revived old proof or revoked unrelated native session');
 lifeError(fn()=>EmailRecovery::confirm($token),'invalid_context');
-$sender=new class implements SmsSender {
+$sender=new class implements MobileCodeDelivery {
     public function id():string{return 'fixture';}
     public function send(string $mobile,string $code,string $purpose):SendResult{throw new RuntimeException('Old ticket sent SMS');}
 };
@@ -299,7 +299,7 @@ unset($token,$auth,$nativeToken,$ticket);
 $former=fixtureUser('fixture_privacy_former','former@example.invalid');
 $later=fixtureUser('fixture_privacy_later','later@example.invalid');
 $formerBinding=Identity::bind($former,'09123330017','absent');
-$testSender=new class implements SmsSender {
+$testSender=new class implements MobileCodeDelivery {
     public string $reference='1717';
     public function id():string{return 'fixture';}
     public function send(string $mobile,string $code,string $purpose):SendResult {

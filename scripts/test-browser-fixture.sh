@@ -67,3 +67,4 @@ for i in $(seq 1 100); do
 done
 curl -ksSf --max-time 5 "$ACH_BROWSER_URL/wp-login.php" >/dev/null
 "$node_bin" "$repo/tests/browser-checkout.cjs"
+"$node_bin" "$repo/tests/browser-ux.cjs"

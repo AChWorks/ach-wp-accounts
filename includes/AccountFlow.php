@@ -186,7 +186,7 @@ final class AccountFlow
         return hash_hmac('sha256', "ach-wpa-flow\0$browser\0$ticket", wp_salt('auth'));
     }
 
-    public function issue(#[\SensitiveParameter] string $browser, #[\SensitiveParameter] string $ticket, string $network, SmsSender $sender): array
+    public function issue(#[\SensitiveParameter] string $browser, #[\SensitiveParameter] string $ticket, string $network, MobileCodeDelivery $sender): array
     {
         $data = self::open($browser, $ticket);
         if ($data['expires'] - time() < $this->verification->codeLifetime()) {

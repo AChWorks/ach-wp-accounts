@@ -3,8 +3,12 @@ namespace ACh\WPAccounts;
 
 defined('ABSPATH') || exit;
 
-/** One bounded transport attempt. No automatic resend or fallback. */
-interface SmsSender
+/**
+ * Deliver a server-generated code to the normalized mobile identity.
+ * Transport does not verify possession or grant authentication authority.
+ * One bounded attempt; no automatic resend or fallback.
+ */
+interface MobileCodeDelivery
 {
     public function id(): string;
     public function send(string $mobile, string $code, string $purpose): SendResult;

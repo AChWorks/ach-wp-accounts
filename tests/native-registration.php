@@ -1,6 +1,6 @@
 <?php
 /** Real core, My Account, Classic and Store API registration boundaries. */
-use ACh\WPAccounts\{AccountFlow,Identity,Settings,SmsSender,SendResult};
+use ACh\WPAccounts\{AccountFlow,Identity,Settings,MobileCodeDelivery,SendResult};
 $root=getenv('ACH_TEST_WP');$dir=getenv('ACH_TEST_DIR');
 if (!$root || !$dir) throw new RuntimeException('Run isolated fixture');
 $case=$argv[1]??'';
@@ -12,7 +12,7 @@ function registrationCheck(bool $ok,string $message):void {if (!$ok) throw new R
 add_filter('pre_wp_mail','__return_true');
 add_filter('pre_http_request',static fn()=>new WP_Error('fixture_no_network'),PHP_INT_MAX);
 add_action('set_logged_in_cookie',static function($cookie):void {$_COOKIE[LOGGED_IN_COOKIE]=$cookie;});
-final class RegistrationFixtureSender implements SmsSender {
+final class RegistrationFixtureSender implements MobileCodeDelivery {
     public string $code='';
     public function id():string{return 'fixture';}
     public function send(string $mobile,string $code,string $purpose):SendResult{$this->code=$code;return new SendResult('accepted','fixture','1');}

@@ -1,5 +1,5 @@
 <?php
-use ACh\WPAccounts\{AccountFlow,Capabilities,Identity,NativeAccess,Settings,VerificationError,SmsSender,SendResult};
+use ACh\WPAccounts\{AccountFlow,Capabilities,Identity,NativeAccess,Settings,VerificationError,MobileCodeDelivery,SendResult};
 $root=getenv('ACH_TEST_WP');
 if (!$root) throw new RuntimeException('Missing fixture');
 require $root.'/wp-load.php';
@@ -12,7 +12,7 @@ function reject(callable $call,string ...$expected):void {
     throw new RuntimeException('Expected denial: '.implode(',',$expected));
 }
 function flags(array $changes):void {update_option(Settings::OPTION,array_replace(Settings::current(),$changes),false);}
-class ExperienceSender implements SmsSender {
+class ExperienceSender implements MobileCodeDelivery {
     public string $code='';
     public function id():string{return 'fixture';}
     public function send(string $mobile,string $code,string $purpose):SendResult{$this->code=$code;return new SendResult('accepted','fixture','1');}

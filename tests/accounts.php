@@ -5,7 +5,7 @@ use ACh\WPAccounts\Accounts;
 use ACh\WPAccounts\Identity;
 use ACh\WPAccounts\Schema;
 use ACh\WPAccounts\SessionProof;
-use ACh\WPAccounts\SmsSender;
+use ACh\WPAccounts\MobileCodeDelivery;
 use ACh\WPAccounts\SendResult;
 use ACh\WPAccounts\Verification;
 use ACh\WPAccounts\VerificationError;
@@ -43,7 +43,7 @@ function expectAccountError(callable $call, string ...$expected): void {
     }
     throw new RuntimeException('Expected rejection: ' . implode('/', $expected));
 }
-final class AccountFixtureSender implements SmsSender {
+final class AccountFixtureSender implements MobileCodeDelivery {
     public string $code = '';
     public int $calls = 0;
     public function id(): string { return 'fixture'; }

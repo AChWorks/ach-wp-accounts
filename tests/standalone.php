@@ -1,5 +1,5 @@
 <?php
-use ACh\WPAccounts\{AccountFlow,Identity,SessionProof,Settings,SettingsError,SmsSender,SendResult};
+use ACh\WPAccounts\{AccountFlow,Identity,SessionProof,Settings,SettingsError,MobileCodeDelivery,SendResult};
 $root=getenv('ACH_TEST_WP');
 if (!$root) { throw new RuntimeException('Run isolated fixture.'); }
 require $root.'/wp-load.php';
@@ -27,7 +27,7 @@ update_option('users_can_register',true);
 update_option('default_role','subscriber');
 wp_set_current_user(0);
 add_action('set_logged_in_cookie',static function($cookie):void {$_COOKIE[LOGGED_IN_COOKIE]=$cookie;});
-$sender=new class implements SmsSender {
+$sender=new class implements MobileCodeDelivery {
     private string $code='';
     public function id():string{return 'fixture';}
     public function send(string $mobile,string $code,string $purpose):SendResult{$this->code=$code;return new SendResult('accepted','fixture');}

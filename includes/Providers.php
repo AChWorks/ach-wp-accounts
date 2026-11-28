@@ -4,7 +4,7 @@ namespace ACh\WPAccounts;
 defined('ABSPATH') || exit;
 
 /** Explicit transport selection; the configured mode never falls back automatically. */
-abstract class HttpSmsSender implements SmsSender
+abstract class HttpSmsSender implements MobileCodeDelivery
 {
     public function __construct(#[\SensitiveParameter] protected readonly array $credentials, protected readonly array $default, protected readonly array $purposes = [])
     {

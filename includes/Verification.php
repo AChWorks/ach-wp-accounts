@@ -159,7 +159,7 @@ final class Verification
      * request subject to the same quotas. Network must be derived from trusted
      * server request context (not a caller-controlled forwarding header).
      */
-    public function issue(string $id, string $mobile, string $purpose, #[\SensitiveParameter] string $flow, string $network, SmsSender $sender, string $identityRevision = ''): array
+    public function issue(string $id, string $mobile, string $purpose, #[\SensitiveParameter] string $flow, string $network, MobileCodeDelivery $sender, string $identityRevision = ''): array
     {
         global $wpdb;
         $this->validateContext($id, $purpose, $flow, true);

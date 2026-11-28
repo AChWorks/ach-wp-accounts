@@ -105,7 +105,7 @@ final class BrowserApi
     }
 
     /** Internal provider configuration, never included in a browser response. */
-    public static function sender(): HttpSmsSender
+    public static function sender(): MobileCodeDelivery
     {
         try {
             return Settings::sender();

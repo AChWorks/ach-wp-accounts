@@ -49,7 +49,7 @@
         let needsReconcile = false;
         let paymentRevision = 0;
         let pageAuthenticated = document.body.classList.contains('logged-in');
-        controllers.set(root,()=>{disposed=true;stopTimer();ticket='';proof='';password.value='';code.value='';});
+        controllers.set(root,()=>{disposed=true;stopTimer();ticket='';proof='';clearCredentials();clearContinuations();});
         const capabilities=()=>model?.capabilities||initialCapabilities;
 
         function classicForm() {
@@ -182,8 +182,7 @@
             if (get('use-account-mobile')) get('use-account-mobile').hidden=true;
             stopTimer();
             ticket = '';proof='';
-            code.value = '';
-            password.value = '';
+            clearCredentials();clearContinuations();
             form.hidden = true;
             get('retry').hidden = true;
             if (allowed) root.hidden = true;
@@ -520,7 +519,11 @@
             busy = value;
             root.setAttribute('data-ach-busy',value?'1':'0');
             form.setAttribute('aria-busy', value ? 'true' : 'false');
-            edit.disabled = value;
+            // No competing flow transitions while a request is settling.
+            for (const name of ['edit','cancel-profile','password-change','toggle-password','change','verify-profile','enroll','recover','retry','success-profile']) {
+                const control = get(name);
+                if (control) control.disabled = value;
+            }
             if (checkout) get('cancel').disabled = value || refreshing;
             mobile.readOnly = value || (checkout && Boolean(billingMobile()));
             code.readOnly = value;
@@ -537,6 +540,19 @@
             }
         }
 
+        function clearPassword() {
+            password.value = '';
+            password.type = 'password';
+            get('toggle-password')?.setAttribute('aria-pressed', 'false');
+        }
+        function clearCredentials() {
+            clearPassword();
+            code.value = '';
+            for (const name of ['new-password','confirm-password']) {
+                const field = get(name);
+                if (field) field.value = '';
+            }
+        }
         function clearContinuations() {
             get('profile-fields').hidden=true;
             for(const field of root.querySelectorAll('[data-ach-name-field]')){
@@ -574,9 +590,7 @@
             masked = '';
             expiresAt = 0;
             resendAt = 0;
-            code.value = '';
-            password.value = '';
-            password.type='password';
+            clearCredentials();
             get('masked').textContent = '';
             get('password-change').hidden = !(surface === 'profile' && next === 'step_up' && profileIntent==='change');
             get('cancel-profile').hidden=surface!=='profile';
@@ -615,7 +629,7 @@
             setField(get('mobile-field'), mobile, false);
             setField(get('password-field'), password, false);
             setField(get('login-field'), login, false);
-            password.value = '';
+            clearPassword();
             setField(get('code-field'), code, phase === 'code');
             get('masked').textContent = masked;
             current.hidden = true;
@@ -634,7 +648,7 @@
         function continuationMode(result) {
             stopTimer();hideMethods();clearContinuations();
             proof=result.proof;phase=result.outcome==='profile_required'?'profile_fields':'reset_fields';
-            expiresAt=0;resendAt=0;code.value='';password.value='';
+            expiresAt=0;resendAt=0;clearCredentials();
             for(const [name,input] of [['mobile',mobile],['password',password],['login',login],['code',code]])setField(get(name+'-field'),input,false);
             edit.hidden=true;resend.hidden=true;current.hidden=true;
             if(phase==='profile_fields'){
@@ -657,7 +671,7 @@
 
         function successState(message, {redirect=false,reset=false}={}) {
             stopTimer();hideMethods();clearContinuations();
-            phase='success';ticket='';proof='';code.value='';password.value='';
+            phase='success';ticket='';proof='';clearCredentials();
             form.hidden=true;get('title').hidden=true;desc.hidden=true;current.hidden=true;
             if(get('recovery'))get('recovery').hidden=true;
             if(get('cancel'))get('cancel').hidden=true;
@@ -687,7 +701,7 @@
                     login: purpose === 'recover' ? login.value : '', contact_email: checkout ? billingEmail() : '' });
                 ticket = started.ticket;
                 masked = started.masked_mobile;
-                password.value = '';
+                clearPassword();
                 phase = 'issue';
             }
             const result = await request('issue', { ticket });
@@ -701,7 +715,7 @@
                 submit.textContent = strings.retry;
                 mobile.readOnly = true;
                 setField(get('password-field'), password, false);
-                password.value = '';
+                clearPassword();
                 edit.hidden = purpose === 'step_up';
             }
             if (error.code === 'existing_account_required' && capabilities().first_link) {
@@ -728,7 +742,7 @@
             }
             if(surface==='profile'){
                 if(profileIntent==='change' && purpose==='step_up'){
-                    model=await request('status');profileIntent='';mode('link',{focus:true});return;
+                    model=await request('status');mode('link',{focus:true});return;
                 }
                 if(profileIntent==='enroll' && purpose==='step_up'){
                     profileIntent='';await load();get('recovery').open=true;get('recovery').querySelector('summary').focus();return;
@@ -868,7 +882,7 @@
 
         function profileView() {
             clearSuccess();clearContinuations();hideMethods();stopTimer();
-            phase='profile';ticket='';proof='';form.hidden=true;
+            phase='profile';ticket='';proof='';clearCredentials();form.hidden=true;
             desc.textContent=model.has_mobile?(model.mobile_verified?strings.verified:strings.unverified):strings.no_mobile;
             current.hidden=!model.has_mobile;
             current.querySelector('bdi').textContent=model.masked_mobile||'';
@@ -927,7 +941,14 @@
             mode(model.can_link?'link':'step_up',{focus:true});
         });
         get('verify-profile').addEventListener('click',()=>{profileIntent='';mode(model.has_mobile?'step_up':'link',{focus:true});});
-        get('cancel-profile').addEventListener('click',()=>{profileIntent='';profileView();});
+        get('cancel-profile').addEventListener('click',()=>{
+            if(busy||disposed)return;
+            const target=profileIntent==='enroll'?'enroll':profileIntent==='change'?'change':'verify-profile';
+            profileIntent='';profileView();
+            const control=get(target);
+            if(control&&!control.hidden)control.focus();
+            else if(!get('change').hidden)get('change').focus();
+        });
         get('enroll')?.addEventListener('click',()=>{profileIntent='enroll';mode('step_up',{focus:true});});
         get('success-profile')?.addEventListener('click',()=>load());
         get('toggle-password')?.addEventListener('click',event=>{
@@ -975,8 +996,8 @@
     function preserveDraft(shell){
         const previous=drafts.get(shell)||{};
         const mobile=shell.querySelector('[data-ach-mobile]'),login=shell.querySelector('[data-ach-login],input[autocomplete="username"]');
-        if(mobile&&mobile.value)previous.mobile=mobile.value;
-        if(login&&login.value)previous.login=login.value;
+        if(mobile)previous.mobile=mobile.value;
+        if(login&&!login.disabled)previous.login=login.value;
         return previous;
     }
     function replaceIds(node){
