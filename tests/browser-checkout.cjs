@@ -180,7 +180,7 @@ async function paid(page,phone,email,priorUrl) {
         await admin.locator('table tbody bdi').filter({hasText:/^09125557771$/}).first().waitFor({state:'visible',timeout:30000});
         // Woo's native search placeholder only appears after focus. Use
         // the native combobox and select its actual free-text option.
-        const search = admin.locator('.woocommerce-report-table input.woocommerce-select-control__control-input[role="combobox"][type="search"]').first();
+        const search = admin.locator('.woocommerce-report-table .woocommerce-search input[role="combobox"]').first();
         await search.click();
         await search.fill('۰۹۱۲۵۵۵۷۷۷۱');
         const freeText = admin.getByText(/All customers with names that include/).first();
