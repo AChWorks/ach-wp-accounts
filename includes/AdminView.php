@@ -277,7 +277,8 @@ final class AdminView
             'allow_registration'=>[__('Mobile registration','ach-wp-accounts'),__('Allow mobile-based registration only where native site registration is enabled.','ach-wp-accounts')],
             'allow_email_registration'=>[__('Email registration','ach-wp-accounts'),__('Allow native public email registration where the site permits it.','ach-wp-accounts')],
             'allow_password_login'=>[__('Customer password sign-in','ach-wp-accounts'),__('Keep password sign-in available to ordinary customers. Administrators and other privileged accounts retain native access. Check access for customers without a mobile number before disabling.','ach-wp-accounts')],
-            'checkout_required'=>[__('Require verified mobile at checkout','ach-wp-accounts'),__('Customers must verify their mobile before payment, regardless of their sign-in method.','ach-wp-accounts')],
+            'checkout_required'=>[__('Require verified mobile at checkout','ach-wp-accounts'),__('Customers must sign in and have a verified mobile before payment.','ach-wp-accounts')],
+            'checkout_reverify'=>[__('Require mobile verification in each checkout session','ach-wp-accounts'),__('When checkout verification is required, enable this to require mobile proof in the current login session. When off, a signed-in customer with a previously verified mobile can pay without another SMS.','ach-wp-accounts')],
         ] as $key=>[$label,$description]) {
             echo '<div class="ach-admin-setting">';
             self::checkbox($key,$label,isset($draft[$key]) ? $draft[$key]==='1' : $s[$key],$description,true);

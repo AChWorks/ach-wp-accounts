@@ -16,8 +16,34 @@ if (in_array($mode,['classic','blocks'],true)) {
     update_option('woocommerce_checkout_page_id',(int)get_option('fixture_'.$mode));
     exit;
 }
+if ($mode==='default-checkout-policy') {
+    $settings=\ACh\WPAccounts\Settings::current();
+    $settings['checkout_reverify']=false;
+    update_option(\ACh\WPAccounts\Settings::OPTION,$settings,false);
+    exit;
+}
 if ($mode==='persian') {
     update_option('WPLANG','fa_IR');
+    exit;
+}
+if (in_array($mode,['order-pay','order-pay-strict'],true)) {
+    $settings=\ACh\WPAccounts\Settings::current();
+    $settings['checkout_reverify']=$mode==='order-pay-strict';
+    update_option(\ACh\WPAccounts\Settings::OPTION,$settings,false);
+    global $wpdb;
+    $owner=\ACh\WPAccounts\Identity::byMobile('+989125557771');
+    if (!$owner) { throw new RuntimeException('Classic fixture owner missing'); }
+    $wpdb->delete(\ACh\WPAccounts\Schema::table('session_proofs'),['user_id'=>$owner->user_id],['%d']);
+    $order=wc_create_order(['customer_id'=>$owner->user_id]);
+    $order->add_product(wc_get_product((int)json_decode(file_get_contents($dir.'/browser-fixture.json'),true)['product']),1);
+    $order->set_billing_first_name('Fixture');
+    $order->set_billing_last_name('Customer');
+    $order->set_billing_email('historical@example.invalid');
+    $order->set_billing_phone('09129999999');
+    $order->set_payment_method('bacs');
+    $order->calculate_totals();
+    $order->save();
+    echo wp_json_encode(['url'=>$order->get_checkout_payment_url(),'id'=>$order->get_id()]);
     exit;
 }
 if ($mode==='state') {

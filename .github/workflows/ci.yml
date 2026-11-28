@@ -36,6 +36,7 @@ jobs:
           node --check assets/accounts.js
           node --check assets/customer-directory.js
           node --check tests/browser-checkout.cjs
+          node --check tests/browser-express.js
           node --check assets/admin.js
       - name: Run isolated WordPress and WooCommerce tests
         run: scripts/test-integration.sh

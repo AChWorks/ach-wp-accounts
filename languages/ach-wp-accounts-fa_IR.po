@@ -954,3 +954,12 @@ msgstr "تأیید و ادامه پرداخت"
 
 msgid "Your checkout has changed. Review your order and select Pay again."
 msgstr "اطلاعات سفارش تغییر کرده است. سفارش را بررسی کنید و دوباره دکمه پرداخت را بزنید."
+
+msgid "Customers must sign in and have a verified mobile before payment."
+msgstr "مشتریان پیش از پرداخت باید وارد حساب شده و شماره موبایل احرازشده داشته باشند."
+
+msgid "Require mobile verification in each checkout session"
+msgstr "الزام احراز مجدد موبایل در نشست پرداخت"
+
+msgid "When checkout verification is required, enable this to require mobile proof in the current login session. When off, a signed-in customer with a previously verified mobile can pay without another SMS."
+msgstr "در صورت الزام احراز موبایل برای پرداخت، با فعال‌کردن این گزینه احراز شماره در نشست ورود فعلی الزامی است. در حالت غیرفعال، مشتری واردشده با شماره موبایل قبلاً احرازشده بدون پیامک مجدد پرداخت می‌کند."

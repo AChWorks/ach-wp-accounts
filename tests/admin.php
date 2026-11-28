@@ -124,6 +124,12 @@ Admin::process('sms',postAdmin('selection',['selected_provider'=>'kavenegar']));
 $rev=Settings::read()['revision'];
 Admin::process('general',postAdmin('general',['auth_enabled'=>'1','allow_registration'=>'1','checkout_required'=>'1']));
 adminCheck(Settings::flag('auth_enabled') && Settings::flag('checkout_required') && Settings::flag('allow_registration'),'General policies not saved');
+adminCheck(!Settings::flag('checkout_reverify'),'Repeat OTP did not default off');
+Admin::process('general',postAdmin('general',['auth_enabled'=>'1','allow_registration'=>'1','checkout_required'=>'1','checkout_reverify'=>'1']));
+adminCheck(Settings::flag('checkout_reverify') && Settings::read()['checkout_reverify']===true,'Repeat OTP setting not saved');
+Admin::process('general',postAdmin('general',['auth_enabled'=>'1','allow_registration'=>'1','checkout_required'=>'1','checkout_reverify'=>'0']));
+adminCheck(!Settings::flag('checkout_reverify'),'Repeat OTP could not be disabled');
+
 $stale=postAdmin('general',['revision'=>$rev,'auth_enabled'=>'0','checkout_required'=>'0']);
 adminError(fn()=>Admin::process('general',$stale),'settings_conflict');
 $_GET=['tab'=>'general'];

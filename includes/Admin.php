@@ -176,7 +176,7 @@ final class Admin
         $credentialWrite = false;
         switch ($action) {
             case 'general':
-                foreach (['auth_enabled','allow_registration','checkout_required','allow_email_registration','allow_password_login'] as $key) {
+                foreach (['auth_enabled','allow_registration','checkout_required','checkout_reverify','allow_email_registration','allow_password_login'] as $key) {
                     $patch[$key] = self::boolean($post,$key);
                 }
                 break;
@@ -284,7 +284,7 @@ final class Admin
     private static function draft(#[\SensitiveParameter] array $post): array
     {
         $safe = [];
-        foreach (['ach_action','revision','provider','selected_provider','auth_enabled','allow_registration','checkout_required','allow_email_registration','allow_password_login',
+        foreach (['ach_action','revision','provider','selected_provider','auth_enabled','allow_registration','checkout_required','checkout_reverify','allow_email_registration','allow_password_login',
             'codeLifetime','cooldown','mobileHourly','networkHourly','siteHourly','siteDaily','verifyHourly',
             'diagnostics_retention_hours','purpose','request_id'] as $key) {
             if (is_string($post[$key] ?? null)) {

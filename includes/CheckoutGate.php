@@ -26,7 +26,22 @@ final class CheckoutGate
 
     public static function qualified(?string $mobile = null): bool
     {
-        return SessionProof::qualifies() && ($mobile === null || $mobile === '' || self::matchesMobile($mobile));
+        // Payment policy is separate from fresh OTP authority for sensitive
+        // account changes. Only a valid native browser session and an actual
+        // verified identity can use the no-repeat policy.
+        if (!Lifecycle::ready()) { return false; }
+        $userId = get_current_user_id();
+        if (SessionProof::currentToken($userId) === '') { return false; }
+        try {
+            $identity = Identity::byUser($userId);
+            if (!$identity || (int)$identity->verified_at <= 0) { return false; }
+            if ($mobile !== null && $mobile !== '' && !hash_equals($identity->mobile, Mobile::normalize($mobile))) {
+                return false;
+            }
+            return !Settings::flag('checkout_reverify') || SessionProof::qualifies();
+        } catch (\InvalidArgumentException|VerificationError $error) {
+            return false;
+        }
     }
 
     public static function blocked(?string $mobile = null): bool

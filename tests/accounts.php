@@ -279,13 +279,17 @@ ensureAccount($result['outcome']==='linked' && get_current_user_id()===$emailId 
 ensureAccount((int)$wpdb->get_var("SELECT COUNT(*) FROM $wpdb->users")===$before+1 &&
     get_userdata($emailId)->user_email==='fixture_email_signup@example.invalid','Email link duplicated or changed the native account');
 nativeSession($emailId);
-ensureAccount(\ACh\WPAccounts\CheckoutGate::blocked(),'Subsequent password session bypassed mobile proof');
+ensureAccount(!\ACh\WPAccounts\CheckoutGate::blocked() && !SessionProof::qualifies(),
+    'Previously verified customer required repeat OTP by default');
+fixtureFlag('checkout_reverify',true);
+ensureAccount(\ACh\WPAccounts\CheckoutGate::blocked(),'Strict repeat-OTP policy bypassed');
 clearLimits();
 $ticket=$flow->start($browser,$emailMobile,'step_up','checkout');
 $sender=sendFlow($flow,$browser,$ticket);
 $flow->complete($browser,$ticket,$sender->code);
 ensureAccount(!\ACh\WPAccounts\CheckoutGate::blocked(),'Existing mobile step-up did not reopen checkout');
 fixtureFlag('checkout_required',false);
+fixtureFlag('checkout_reverify',false);
 fixtureFlag('allow_registration',true);
 
 $plainPassword=wp_generate_password(32);

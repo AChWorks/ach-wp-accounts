@@ -17,3 +17,17 @@ add_filter('pre_http_request',static function($pre,$args,$url) {
     }
     return new WP_Error('fixture_no_network');
 },PHP_INT_MAX,3);
+
+// A synthetic express adapter runs WooCommerce's real express registration,
+// event and Store API flow without contacting a payment provider.
+add_action('woocommerce_blocks_payment_method_type_registration',static function($registry) {
+    $registry->register(new class extends \Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodType {
+        protected $name='fixture_express';
+        public function initialize() {}
+        public function get_payment_method_script_handles() {
+            wp_register_script('fixture-express',WPMU_PLUGIN_URL.'/fixture-express.js',['wc-blocks-registry','wp-element'],'1',true);
+            return ['fixture-express'];
+        }
+        public function get_payment_method_data() { return ['supports'=>['products']]; }
+    });
+});

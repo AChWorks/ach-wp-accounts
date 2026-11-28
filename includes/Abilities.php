@@ -114,6 +114,7 @@ final class Abilities
             'allow_email_registration' => ['type'=>'boolean'],
             'allow_password_login' => ['type'=>'boolean'],
             'checkout_required' => ['type'=>'boolean'],
+            'checkout_reverify' => ['type'=>'boolean'],
             'selected_provider' => self::enum(['',...$providerIds]),
             'providers' => self::object(array_fill_keys($providerIds, $provider)),
             'verification' => self::object($policy, $output ? array_keys($policy) : []),

@@ -121,7 +121,7 @@ if ($mode!=='parent') {
     throw new RuntimeException('Unknown fixture mode');
 }
 $old=Settings::current();
-$s=$old;$s['checkout_required']=true;update_option(Settings::OPTION,$s,false);
+$s=$old;$s['checkout_required']=true;$s['checkout_reverify']=true;update_option(Settings::OPTION,$s,false);
 update_option('woocommerce_default_country','US:CA');
 update_option('woocommerce_enable_guest_checkout','yes');
 update_option('woocommerce_calc_taxes','no');
@@ -173,6 +173,21 @@ foreach (['classic','store'] as $i=>$mode) {
         $order->get_billing_email()==='fixture-order-billing@example.invalid' &&
         (float)$order->get_total()===10.0 && get_userdata($id)->user_email==='',
         'Native order ownership, billing contact or payment result invalid');
+    // Disable session step-up: a verified identity with a new native
+    // password session must reach the actual gateway without OTP.
+    $s['checkout_reverify']=false;
+    update_option(Settings::OPTION,$s,false);
+    [$relaxed,$state]=childPurchase($mode,$id,$productId,false);
+    $success=$mode==='classic' ? ($relaxed['result'] ?? '')==='success' : ($relaxed['status'] ?? 0)===200 &&
+        ($relaxed['data']['payment_result']['payment_status'] ?? '')==='success';
+    $orders=file($paid,FILE_IGNORE_NEW_LINES);
+    $order=wc_get_order((int)end($orders));
+    purchaseCheck($success && count($orders)===$before+2 && $order && $order->is_paid() &&
+        $order->get_customer_id()===$id && $state['cart_count']===0 && !$state['qualified'],
+        'Verified native session was not permitted without repeat OTP: '.$mode);
+    $s['checkout_reverify']=true;
+    update_option(Settings::OPTION,$s,false);
+
 }
 $nativeEmail='fixture-purchase-native@example.invalid';
 $nativeId=wp_insert_user(['user_login'=>'fixture_purchase_native','user_pass'=>'fixture-native-email-password',
@@ -189,4 +204,4 @@ purchaseCheck(count($orders)===$before+1 && $state['cart_count']===0 &&
     $order->get_customer_id()===$nativeId && $order->get_billing_email()==='fixture-order-billing@example.invalid' &&
     get_userdata($nativeId)->user_email===$nativeEmail,'First-link checkout changed account or payment ownership');
 update_option(Settings::OPTION,$old,false);
-echo "PASS: real native Classic and Store API checkout to isolated successful fixture gateway, negative gate/cart preservation, native email sign-in and first-link in the same cart/session, native order ownership and billing email separation\n";
+echo "PASS: real native Classic and Store API checkout to isolated successful fixture gateway, negative gate/cart preservation, native email sign-in and first-link in the same cart/session, native order ownership, default no-repeat OTP policy, and billing email separation\n";

@@ -30,6 +30,7 @@ final class Settings
             'allow_email_registration' => true,
             'allow_password_login' => true,
             'checkout_required' => false,
+            'checkout_reverify' => false,
             'selected_provider' => '',
             'providers' => [],
             'verification' => [
@@ -149,6 +150,7 @@ final class Settings
             'allow_email_registration' => $s['allow_email_registration'] === true,
             'allow_password_login' => $s['allow_password_login'] === true,
             'checkout_required' => $s['checkout_required'] === true,
+            'checkout_reverify' => $s['checkout_reverify'] === true,
             'selected_provider' => $s['selected_provider'],
             'providers' => (object)$providers,
             'verification' => $s['verification'],
@@ -283,7 +285,7 @@ final class Settings
             throw new SettingsError('schema','schema_unsupported');
         }
         global $wpdb;
-        self::keys($patch, ['auth_enabled','allow_registration','checkout_required','allow_email_registration','allow_password_login','selected_provider',
+        self::keys($patch, ['auth_enabled','allow_registration','checkout_required','checkout_reverify','allow_email_registration','allow_password_login','selected_provider',
             'providers','verification','diagnostics_retention_hours'], '');
         // Read the exact stored option row rather than a stale object-cache
         // value. WordPress update_option has no expected-value precondition.
@@ -300,7 +302,7 @@ final class Settings
                 throw new SettingsError('revision', 'settings_conflict');
             }
             $next = array_replace(self::defaults(), array_intersect_key($stored, self::defaults()));
-            foreach (['auth_enabled','allow_registration','checkout_required','allow_email_registration','allow_password_login'] as $key) {
+            foreach (['auth_enabled','allow_registration','checkout_required','checkout_reverify','allow_email_registration','allow_password_login'] as $key) {
                 if (array_key_exists($key, $patch)) {
                     if (!is_bool($patch[$key])) {
                         throw new SettingsError($key);

@@ -100,7 +100,29 @@ async function paid(page,phone,email,priorUrl) {
         assert.equal(order.total,'20.00');
         assert.equal(order.notes,'Changed after OTP started');
         console.log('PASS: Classic guest inline OTP, wrong-code retry, changed checkout requires reconfirmation, native fields/coupon/gateway/session preserved and successful order');
+        const noRepeat=JSON.parse(command('order-pay'));
+        await page.goto(noRepeat.url);
+        await page.locator('form#order_review #place_order').waitFor({state:'visible'});
+        const priorSms=fs.readFileSync(otpFile,'utf8');
+        await page.locator('#place_order').click();
+        await page.waitForURL(/order-received/,{timeout:25000});
+        assert.equal(fs.readFileSync(otpFile,'utf8'),priorSms,'Default verified login sent another SMS');
+        assert.equal(JSON.parse(command('state')).find(o=>o.id===noRepeat.id).status,'on-hold');
+        console.log('PASS: default verified native login with no session OTP pays without another SMS');
+        const payable=JSON.parse(command('order-pay-strict'));
+        await page.goto(payable.url);
+        await page.locator('form#order_review #place_order').waitFor({state:'visible'});
+        assert.equal(await page.locator(otpRoot).isVisible(),false);
+        await page.locator('#place_order').click();
+        await otp(page,mobile);
+        await page.waitForURL(/order-received/,{timeout:25000});
+        const historical=JSON.parse(command('state')).find(o=>o.id===payable.id);
+        assert.equal(historical.customer,order.customer);
+        assert.equal(historical.phone,'09129999999');
+        assert.equal(historical.status,'on-hold');
+        console.log('PASS: actual native order-pay browser step-up, ownership and historical billing preserved');
         await context.close();
+        command('default-checkout-policy');
         command('blocks');
         const blockContext=await browser.newContext({ignoreHTTPSErrors:true,viewport:{width:1280,height:900}});
         const block=await blockContext.newPage();
@@ -121,6 +143,55 @@ async function paid(page,phone,email,priorUrl) {
         assert.equal(blockOrder.total,'25.00');
         console.log('PASS: Blocks guest inline OTP, native Store API cart/customer/nonce reconciliation and successful order');
         await blockContext.close();
+        const expressContext=await browser.newContext({ignoreHTTPSErrors:true,viewport:{width:1280,height:900}});
+        const express=await expressContext.newPage();
+        express.on('pageerror',e=>console.log('Express exception:',e.message));
+        await addCart(express,fixture.blocks);
+        await express.locator('#fixture-express-payment').waitFor({state:'visible',timeout:15000});
+        await express.locator('#billing-country').selectOption('US');
+        await express.locator('#billing-state').selectOption('CA');
+        const expressMobile='09125557774',expressEmail='express@example.invalid';
+        await setFields(express,{...blockFields,'#billing-phone':expressMobile,'#email':expressEmail});
+        const expressBefore=express.url();
+        await express.locator('#fixture-express-payment').click();
+        await express.locator(codeField).waitFor({state:'visible',timeout:15000});
+        assert.equal(express.url(),expressBefore);
+        assert.ok(!JSON.parse(command('state')).some(o=>o.email===expressEmail&&o.status==='on-hold'),'Express paid before proof');
+        await otp(express,expressMobile);
+        const expressOrder=await paid(express,expressMobile,expressEmail,expressBefore);
+        assert.equal(expressOrder.total,'25.00');
+        console.log('PASS: native registered Blocks express method held until mobile proof, then native fixture payment');
+        await expressContext.close();
+        const adminContext=await browser.newContext({ignoreHTTPSErrors:true,viewport:{width:1280,height:900}});
+        const admin=await adminContext.newPage();
+        await admin.goto(base+'/wp-login.php?redirect_to='+encodeURIComponent(base+'/wp-admin/'));
+        await admin.locator('#user_login').fill('fixture_admin');
+        await admin.locator('#user_pass').fill('fixture-only-admin-password-123');
+        await admin.locator('#wp-submit').click();
+        await admin.waitForURL(/wp-admin/);
+        await admin.goto(base+'/wp-admin/users.php?s='+encodeURIComponent('۰۹۱۲۵۵۵۷۷۷۱'));
+        await admin.locator('th#ach_accounts_mobile').waitFor({state:'visible'});
+        assert.equal(await admin.locator('tbody .column-ach_accounts_mobile').count(),1);
+        assert.match(await admin.locator('tbody .column-ach_accounts_mobile').innerText(),/09125557771/);
+        assert.match(await admin.locator('tbody .column-ach_accounts_verified').innerText(),/Verified/);
+        console.log('PASS: actual native WordPress users-list mobile columns and Persian-digit search');
+        await admin.goto(base+'/wp-admin/admin.php?page=wc-admin&path=%2Fcustomers');
+        await admin.getByText('Mobile verification',{exact:true}).first().waitFor({state:'visible',timeout:30000});
+        await admin.locator('table tbody bdi').filter({hasText:/^09125557771$/}).first().waitFor({state:'visible',timeout:30000});
+        // Woo's native search placeholder only appears after focus. Use
+        // the native combobox and select its actual free-text option.
+        const search = admin.locator('.woocommerce-report-table input.woocommerce-select-control__control-input[role="combobox"][type="search"]').first();
+        await search.click();
+        await search.fill('۰۹۱۲۵۵۵۷۷۷۱');
+        const freeText = admin.getByText(/All customers with names that include/).first();
+        await freeText.waitFor({state:'visible',timeout:15000});
+        await freeText.click();
+        await admin.waitForFunction(()=>document.querySelector('table tbody')?.innerText.includes('09125557771') &&
+            !document.querySelector('table tbody')?.innerText.includes('09125557772'),{},{timeout:15000});
+        console.log('PASS: actual WooCommerce Customers native table and mobile search UI');
+        await adminContext.close();
+
+
         if (process.env.ACH_TEST_PERSIAN==='1') {
             command('persian');
             const rtl=await browser.newContext({ignoreHTTPSErrors:true,viewport:{width:390,height:844}});
