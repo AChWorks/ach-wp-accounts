@@ -194,7 +194,7 @@ final class AccountPolicy
      */
     public static function recoveryUser(string $login, #[\SensitiveParameter] string $password): \WP_User
     {
-        if (get_current_user_id() !== 0 || $login === '' || $password === '') {
+        if (!Settings::flag('allow_first_link') || get_current_user_id() !== 0 || $login === '' || $password === '') {
             throw new VerificationError('reauthentication_required');
         }
         $network = hash_hmac('sha256', (string)($_SERVER['REMOTE_ADDR'] ?? ''), wp_salt('auth'));
@@ -204,7 +204,7 @@ final class AccountPolicy
             self::reserveAccountAction('recover', $candidate->ID, 10, 'reauthentication_unavailable');
         }
         $user = NativeAccess::reauthenticate($login, $password);
-        if (!$user instanceof \WP_User || !self::ordinary($user) || Identity::byUser($user->ID)) {
+        if (!$user instanceof \WP_User || !self::ordinary($user) || !NativeAccess::emailIdentifierAllowed($login,$user) || Identity::byUser($user->ID)) {
             throw new VerificationError('reauthentication_required');
         }
         return $user;
@@ -228,14 +228,15 @@ final class AccountPolicy
 /** Internal native account operations, called only after consuming OTP proof. */
 final class Accounts
 {
-    public static function register(string $mobile, string $context): object
+    public static function register(string $mobile, string $context, array $fields = []): object
     {
         $mobile = Mobile::normalize($mobile);
+        $fields = Capabilities::validateNames($fields);
         return DatabaseLock::run('registration-'.$mobile,
-            static fn()=>self::registerLocked($mobile,$context),'registration_pending');
+            static fn()=>self::registerLocked($mobile,$context,$fields),'registration_pending');
     }
 
-    private static function registerLocked(string $mobile,string $context): object
+    private static function registerLocked(string $mobile,string $context,array $fields): object
     {
         $role = AccountPolicy::registrationRole($context);
         $reservation = Identity::reserveRegistration($mobile);
@@ -247,7 +248,7 @@ final class Accounts
             'role' => $role,
             'display_name' => __('Customer', 'ach-wp-accounts'),
             'meta_input' => ['_ach_accounts_registration' => $reservation->revision],
-        ];
+        ] + $fields;
         $commerce = $context !== 'wp';
         try {
             $errors = new \WP_Error();

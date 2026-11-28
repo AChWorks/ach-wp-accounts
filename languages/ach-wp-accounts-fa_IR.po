@@ -1,6 +1,12 @@
 msgid ""
 msgstr "Project-Id-Version: ACh WP Accounts\nLanguage: fa_IR\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nPlural-Forms: nplurals=2; plural=(n > 1);\n"
 
+msgid "%s — Sign in"
+msgstr "%s — ورود"
+
+msgid "A confirmed email remains on the account when enrollment is disabled."
+msgstr "با غیرفعال شدن امکان افزودن ایمیل، ایمیل تأییدشده قبلی در حساب باقی می‌ماند."
+
 msgid "ACh WP Accounts"
 msgstr "ACh WP Accounts"
 
@@ -10,6 +16,9 @@ msgstr "افزونه نتوانست پایگاه داده یا پاک‌سازی
 msgid "API key"
 msgstr "کلید API"
 
+msgid "Accent color"
+msgstr "رنگ اصلی"
+
 msgid "Accepted"
 msgstr "پذیرفته‌شده"
 
@@ -18,6 +27,9 @@ msgstr "پذیرفته‌شده توسط ارائه‌دهنده"
 
 msgid "Account access"
 msgstr "دسترسی به حساب کاربری"
+
+msgid "Account and checkout"
+msgstr "حساب و پرداخت"
 
 msgid "Account data is temporarily unavailable."
 msgstr "اطلاعات حساب موقتاً در دسترس نیست."
@@ -40,6 +52,9 @@ msgstr "فعال"
 msgid "Active SMS provider"
 msgstr "ارائه‌دهنده فعال پیامک"
 
+msgid "Add mobile number"
+msgstr "افزودن شماره موبایل"
+
 msgid "Additional mobile verification"
 msgstr "تأیید مجدد موبایل"
 
@@ -58,14 +73,38 @@ msgstr "پس از بررسی آثار عملیات بومی حساب، رزرو 
 msgid "All"
 msgstr "همه"
 
+msgid "Allow eligible accounts to sign in with an SMS code."
+msgstr "اجازه ورود به حساب‌های مجاز با کد پیامکی."
+
 msgid "Allow eligible accounts to sign in with an SMS code. Native password sign-in remains available."
 msgstr "ورود حساب‌های مجاز با کد پیامکی امکان‌پذیر باشد. ورود با رمز عبور همچنان در دسترس است."
+
+msgid "Allow email as a sign-in identifier"
+msgstr "اجازه ورود با ایمیل"
+
+msgid "Allow guests to prove existing credentials and a new mobile without creating a duplicate account."
+msgstr "کاربر می‌تواند با اثبات اطلاعات حساب موجود و تأیید موبایل، بدون ساخت حساب تکراری، شماره خود را متصل کند."
 
 msgid "Allow mobile-based registration only where native site registration is enabled."
 msgstr "ثبت‌نام با موبایل فقط در بخش‌هایی مجاز باشد که ثبت‌نام بومی سایت فعال است."
 
+msgid "Allow native public email registration where the site permits it."
+msgstr "ثبت‌نام عمومی با ایمیل در صورت مجاز بودن در تنظیمات سایت."
+
+msgid "Allow optional recovery email"
+msgstr "امکان افزودن ایمیل بازیابی"
+
+msgid "Allow optional recovery password"
+msgstr "امکان تنظیم رمز عبور اختیاری"
+
 msgid "Allowed range: 1–168 hours."
 msgstr "بازه مجاز: ۱ تا ۱۶۸ ساعت."
+
+msgid "An existing account uses this email address. Recover that account before creating another account."
+msgstr "حسابی با این ایمیل وجود دارد. برای جلوگیری از ساخت حساب تکراری، ابتدا حساب فعلی خود را بازیابی کنید."
+
+msgid "Appearance"
+msgstr "ظاهر"
 
 msgid "Attempts exhausted"
 msgstr "سقف تلاش تکمیل شده"
@@ -75,6 +114,18 @@ msgstr "تعداد تلاش:"
 
 msgid "Awaiting code"
 msgstr "در انتظار کد"
+
+msgid "Back"
+msgstr "بازگشت"
+
+msgid "Back to site"
+msgstr "بازگشت به سایت"
+
+msgid "Cancel"
+msgstr "انصراف"
+
+msgid "Cancel verification"
+msgstr "لغو تأیید شماره"
 
 msgid "Category"
 msgstr "دسته‌بندی"
@@ -91,9 +142,6 @@ msgstr "این تغییر فقط بر تاریخچه عیب‌یابی اثر د
 msgid "Check HTTPS origin, database schema and scheduled cleanup before enabling mobile sign-in."
 msgstr "پیش از فعال‌سازی ورود با موبایل، آدرس HTTPS، ساختار پایگاه داده و پاک‌سازی زمان‌بندی‌شده را بررسی کنید."
 
-msgid "Preview source=digits directly on the site, or supply a complete reviewed evidence/rows manifest. Check all source conflicts; no possession is asserted."
-msgstr "نگاشت‌های Digits را مستقیماً در سایت پیش‌نمایش کنید (source=digits) یا فهرست کامل بررسی‌شده را با evidence/rows ارسال کنید. همه تعارض‌های منبع بررسی می‌شوند؛ مالکیت شماره تأیید نمی‌شود."
-
 msgid "Check provider access without sending a message."
 msgstr "بررسی دسترسی به ارائه‌دهنده بدون ارسال پیامک."
 
@@ -103,14 +151,38 @@ msgstr "فیلد مشخص‌شده را بررسی کنید و دوباره تل
 msgid "Check the provider credentials and the selected pattern or text configuration."
 msgstr "اطلاعات اتصال و تنظیمات الگو یا متن پیامک را بررسی کنید."
 
+msgid "Check your email"
+msgstr "ایمیل خود را بررسی کنید"
+
 msgid "Check your email for the confirmation link. Your account email has not changed yet."
 msgstr "لینک تأیید را در ایمیل خود بررسی کنید. ایمیل حساب شما هنوز تغییر نکرده است."
+
+msgid "Check your email to complete registration."
+msgstr "برای تکمیل ثبت‌نام ایمیل خود را بررسی کنید."
+
+msgid "Checking…"
+msgstr "در حال بررسی…"
+
+msgid "Checkout"
+msgstr "تسویه‌حساب"
+
+msgid "Choose an available recovery method."
+msgstr "روش بازیابی رمز عبور را انتخاب کنید."
 
 msgid "Close"
 msgstr "بستن"
 
 msgid "Code lifetime (seconds)"
 msgstr "مدت اعتبار کد (ثانیه)"
+
+msgid "Complete the required field."
+msgstr "فیلد ضروری را تکمیل کنید."
+
+msgid "Complete the required name fields."
+msgstr "فیلدهای الزامی نام را کامل کنید."
+
+msgid "Complete your account details"
+msgstr "تکمیل اطلاعات حساب"
 
 msgid "Configure provider"
 msgstr "پیکربندی ارائه‌دهنده"
@@ -126,6 +198,9 @@ msgstr "حذف تنظیمات این ارائه‌دهنده را تأیید م�
 
 msgid "Confirm the requested action first."
 msgstr "ابتدا عملیات درخواستی را تأیید کنید."
+
+msgid "Confirm your existing account credentials and verify a mobile number to keep your account."
+msgstr "اطلاعات ورود به حساب فعلی خود را تأیید کنید و شماره موبایل را احراز کنید تا همان حساب حفظ شود."
 
 msgid "Confirm your recovery email for %s"
 msgstr "تأیید ایمیل بازیابی حساب در %s"
@@ -148,8 +223,20 @@ msgstr "آزمایش اتصال"
 msgid "Continue checkout"
 msgstr "ادامه خرید"
 
+msgid "Continue to destination"
+msgstr "ادامه به صفحه مقصد"
+
+msgid "Continue with mobile number"
+msgstr "ادامه با شماره موبایل"
+
+msgid "Corner radius (px)"
+msgstr "گردی کادر (پیکسل)"
+
 msgid "Correlation ID"
 msgstr "شناسه پیگیری"
+
+msgid "Could not load this account method. Please try again."
+msgstr "این روش دسترسی به حساب بارگذاری نشد. دوباره تلاش کنید."
 
 msgid "Could not reach the verification service. Please try again."
 msgstr "ارتباط با سرویس تأیید برقرار نشد. دوباره تلاش کنید."
@@ -157,8 +244,17 @@ msgstr "ارتباط با سرویس تأیید برقرار نشد. دوبار�
 msgid "Current password"
 msgstr "رمز عبور فعلی"
 
+msgid "Custom image"
+msgstr "تصویر سفارشی"
+
 msgid "Customer"
 msgstr "مشتری"
+
+msgid "Customer password sign-in"
+msgstr "ورود مشتری با رمز عبور"
+
+msgid "Customers must sign in and have a verified mobile before payment."
+msgstr "مشتریان پیش از پرداخت باید وارد حساب شده و شماره موبایل احرازشده داشته باشند."
 
 msgid "Customers must verify their mobile before payment, regardless of their sign-in method."
 msgstr "مشتریان باید پیش از پرداخت، صرف‌نظر از روش ورود، شماره موبایل خود را تأیید کنند."
@@ -168,6 +264,9 @@ msgstr "پیام پیش‌فرض"
 
 msgid "Delivery may have occurred. Do not automatically send another message."
 msgstr "ممکن است پیامک ارسال شده باشد. پیام دیگری به‌صورت خودکار ارسال نکنید."
+
+msgid "Desktop"
+msgstr "دسکتاپ"
 
 msgid "Details"
 msgstr "جزئیات"
@@ -190,20 +289,50 @@ msgstr "قبل از غیرفعال‌کردن ورود با موبایل، ال�
 msgid "Disabled"
 msgstr "غیرفعال"
 
+msgid "Discard changes"
+msgstr "صرف‌نظر از تغییرات"
+
 msgid "Duration (ms)"
 msgstr "مدت عملیات (میلی‌ثانیه)"
 
 msgid "Edit number"
 msgstr "ویرایش شماره"
 
+msgid "Email address"
+msgstr "آدرس ایمیل"
+
+msgid "Email or username"
+msgstr "ایمیل یا نام کاربری"
+
 msgid "Email or username sign-in and native email registration remain governed by WordPress and WooCommerce."
 msgstr "ورود با ایمیل یا نام کاربری و ثبت‌نام ایمیلی مطابق تنظیمات وردپرس و ووکامرس باقی می‌ماند."
+
+msgid "Email registration"
+msgstr "ثبت‌نام با ایمیل"
+
+msgid "Email registration requiring a native password setup link is unavailable while email password reset is disabled."
+msgstr "ثبت‌نام ایمیلی که به پیوند تعیین رمز بومی نیاز دارد، هنگام غیرفعال بودن بازیابی رمز با ایمیل در دسترس نیست."
+
+msgid "Empty inherits the default; 0–64 pixels."
+msgstr "برای ارث‌بری خالی بگذارید؛ ۰ تا ۶۴ پیکسل."
+
+msgid "Empty inherits the site background."
+msgstr "برای ارث‌بری پس‌زمینه سایت خالی بگذارید."
+
+msgid "Empty inherits the site color; otherwise use a six-digit hex color."
+msgstr "برای ارث‌بری رنگ سایت خالی بگذارید؛ یا رنگ هگزادسیمال شش‌رقمی وارد کنید."
 
 msgid "Enable JavaScript to verify your mobile number. Native sign-in remains available where permitted."
 msgstr "برای تأیید شماره موبایل، JavaScript مرورگر را فعال کنید. در صورت مجاز بودن، ورود با روش‌های دیگر همچنان امکان‌پذیر است."
 
+msgid "Enable mobile sign-in or keep password sign-in available to customers."
+msgstr "ورود با موبایل را فعال کنید یا امکان ورود مشتریان با رمز عبور را حفظ کنید."
+
 msgid "Enabled"
 msgstr "فعال"
+
+msgid "Enter a valid mobile number before payment."
+msgstr "پیش از پرداخت شماره موبایل معتبری وارد کنید."
 
 msgid "Enter one value per line in the provider template order. Include {code} where the verification code belongs."
 msgstr "هر مقدار را مطابق ترتیب الگوی ارائه‌دهنده در یک خط وارد کنید. در محل کد تأیید از {code} استفاده کنید."
@@ -211,8 +340,20 @@ msgstr "هر مقدار را مطابق ترتیب الگوی ارائه‌ده�
 msgid "Enter the code sent to your mobile number."
 msgstr "کد ارسال‌شده به شماره موبایل خود را وارد کنید."
 
+msgid "Enter the mobile number already verified on your account."
+msgstr "شماره موبایلی را وارد کنید که قبلاً در حساب شما تأیید شده است."
+
+msgid "Enter your email or username."
+msgstr "ایمیل یا نام کاربری خود را وارد کنید."
+
 msgid "Enter your mobile number."
 msgstr "شماره موبایل خود را وارد کنید."
+
+msgid "Existing accounts without a mobile number may lose access. Review recovery before disabling sign-in methods."
+msgstr "حساب‌های قبلی بدون شماره موبایل ممکن است دسترسی خود را از دست بدهند. پیش از غیرفعال کردن روش‌های ورود، مسیر بازیابی را بررسی کنید."
+
+msgid "Existing native credentials remain unchanged."
+msgstr "اطلاعات ورود قبلی بدون تغییر باقی می‌مانند."
 
 msgid "Expired"
 msgstr "منقضی‌شده"
@@ -232,8 +373,17 @@ msgstr "فیلد:"
 msgid "Filter"
 msgstr "فیلتر"
 
+msgid "First name"
+msgstr "نام"
+
 msgid "For your protection, re-enter any new credentials before saving."
 msgstr "برای حفظ اطلاعات محرمانه، پیش از ذخیره، اطلاعات اتصال جدید را دوباره وارد کنید."
+
+msgid "Forgot password?"
+msgstr "رمز عبور را فراموش کرده‌اید؟"
+
+msgid "Form fields"
+msgstr "فیلدهای فرم"
 
 msgid "General"
 msgstr "عمومی"
@@ -247,14 +397,23 @@ msgstr "تاریخچه در دسترس نیست"
 msgid "I confirm sending one potentially billable test message."
 msgstr "ارسال یک پیامک آزمایشی را که ممکن است هزینه داشته باشد تأیید می‌کنم."
 
-msgid "Import uncontested existing-account mappings from the exact approved source or manifest digest. Fresh OTP verifies possession. Confirm first; resume with next offset. Does not create, merge or overwrite accounts."
-msgstr "نگاشت‌های بدون تعارض حساب‌های موجود را با شناسه دقیق تأییدشده منبع یا فهرست وارد کنید. مالکیت شماره با کد تأیید جدید احراز می‌شود. ابتدا تأیید کنید و سپس از موقعیت بعدی ادامه دهید. حسابی ایجاد، ادغام یا بازنویسی نمی‌شود."
+msgid "Identity source"
+msgstr "منبع هویت"
+
+msgid "If the account is eligible for recovery, a password reset link will be sent."
+msgstr "اگر حساب واجد شرایط بازیابی باشد، پیوند تعیین رمز ارسال می‌شود."
 
 msgid "Import reviewed Digits identities"
 msgstr "انتقال هویت‌های بررسی‌شده Digits"
 
+msgid "Import uncontested existing-account mappings from the exact approved source or manifest digest. Fresh OTP verifies possession. Confirm first; resume with next offset. Does not create, merge or overwrite accounts."
+msgstr "نگاشت‌های بدون تعارض حساب‌های موجود را با شناسه دقیق تأییدشده منبع یا فهرست وارد کنید. مالکیت شماره با کد تأیید جدید احراز می‌شود. ابتدا تأیید کنید و سپس از موقعیت بعدی ادامه دهید. حسابی ایجاد، ادغام یا بازنویسی نمی‌شود."
+
 msgid "Include {code} in the message. It is replaced with the verification code."
 msgstr "از {code} در متن پیام استفاده کنید تا با کد تأیید جایگزین شود."
+
+msgid "Inherit the site appearance by default. Overrides are limited to account components."
+msgstr "به‌صورت پیش‌فرض ظاهر از سایت به ارث می‌رسد. تغییرات فقط روی اجزای حساب اعمال می‌شوند."
 
 msgid "Inspect installed schema version and available provider capabilities. Does not send messages or access credentials."
 msgstr "بررسی نسخه ساختار داده و قابلیت‌های ارائه‌دهندگان پیامک، بدون ارسال پیام یا دسترسی به اطلاعات محرمانه."
@@ -262,11 +421,44 @@ msgstr "بررسی نسخه ساختار داده و قابلیت‌های ار�
 msgid "Inspect interrupted registrations"
 msgstr "بررسی ثبت‌نام‌های نیمه‌تمام"
 
+msgid "Invalid credentials."
+msgstr "اطلاعات ورود صحیح نیست."
+
+msgid "Keep password sign-in available to ordinary customers. Administrators and other privileged accounts retain native access. Check access for customers without a mobile number before disabling."
+msgstr "ورود مشتریان عادی با رمز عبور را فعال نگه دارید. دسترسی بومی مدیران و حساب‌های دارای دسترسی ویژه حفظ می‌شود. پیش از غیرفعال‌سازی، دسترسی مشتریان بدون شماره موبایل را بررسی کنید."
+
 msgid "Last connection test"
 msgstr "آخرین آزمایش اتصال"
 
+msgid "Last name"
+msgstr "نام خانوادگی"
+
+msgid "Link a mobile number to an existing account"
+msgstr "اتصال شماره موبایل به حساب موجود"
+
+msgid "Link an existing account"
+msgstr "اتصال حساب موجود"
+
+msgid "Link mobile to an existing account"
+msgstr "اتصال شماره موبایل به حساب موجود"
+
 msgid "Link or change mobile"
 msgstr "اتصال یا تغییر شماره موبایل"
+
+msgid "Loading settings…"
+msgstr "در حال بارگذاری تنظیمات…"
+
+msgid "Local font attachment ID"
+msgstr "شناسه رسانه فونت محلی"
+
+msgid "Logo"
+msgstr "لوگو"
+
+msgid "Logo media attachment ID"
+msgstr "شناسه رسانه لوگو"
+
+msgid "Manage recovery options"
+msgstr "مدیریت گزینه‌های بازیابی"
 
 msgid "Manage your mobile number"
 msgstr "مدیریت شماره موبایل"
@@ -283,11 +475,23 @@ msgstr "شناسه پیامک"
 msgid "Message text"
 msgstr "متن پیامک"
 
+msgid "Mobile"
+msgstr "موبایل"
+
 msgid "Mobile number"
 msgstr "شماره موبایل"
 
+msgid "Mobile number verified."
+msgstr "شماره موبایل تأیید شد."
+
+msgid "Mobile password reset"
+msgstr "بازیابی رمز با موبایل"
+
 msgid "Mobile registration"
 msgstr "ثبت‌نام با موبایل"
+
+msgid "Mobile registration fields"
+msgstr "فیلدهای ثبت‌نام با موبایل"
 
 msgid "Mobile session verification"
 msgstr "تأیید موبایل نشست"
@@ -301,6 +505,9 @@ msgstr "ورود با موبایل فعال است، اما ارائه‌دهن�
 msgid "Mobile sign-in requires a compatible HTTPS site origin and installed database schema."
 msgstr "ورود با موبایل به آدرس HTTPS سازگار و ساختار پایگاه داده نصب‌شده نیاز دارد."
 
+msgid "Mobile verification"
+msgstr "احراز شماره موبایل"
+
 msgid "Mobile verification is temporarily unavailable."
 msgstr "تأیید موبایل موقتاً در دسترس نیست."
 
@@ -310,11 +517,20 @@ msgstr "تأیید موبایل موقتاً در دسترس نیست. بعدا�
 msgid "Mobile verification requests"
 msgstr "درخواست‌های تأیید موبایل"
 
+msgid "Mobile verified, but checkout could not be refreshed. Select Pay to try again."
+msgstr "شماره موبایل تأیید شد اما به‌روزرسانی سفارش انجام نشد. برای تلاش مجدد دکمه پرداخت را بزنید."
+
+msgid "Mobile verified. Review your order and select Pay to continue."
+msgstr "شماره موبایل تأیید شد. سفارش را بررسی کنید و برای ادامه دکمه پرداخت را بزنید."
+
 msgid "Mobile-created account"
 msgstr "حساب ایجادشده با موبایل"
 
 msgid "Multisite account identity is not supported by this development version."
 msgstr "این نسخه توسعه از هویت حساب در وردپرس چندسایته پشتیبانی نمی‌کند."
+
+msgid "My account"
+msgstr "حساب کاربری"
 
 msgid "Native account recovery evidence was retained to preserve access."
 msgstr "اطلاعات لازم برای بازیابی بومی حساب جهت حفظ دسترسی نگه داشته شد."
@@ -333,6 +549,12 @@ msgstr "هنوز رویدادی برای عیب‌یابی ثبت نشده اس�
 
 msgid "No matching diagnostic events."
 msgstr "رویدادی مطابق فیلترها یافت نشد."
+
+msgid "No mobile number"
+msgstr "بدون شماره موبایل"
+
+msgid "No mobile number is linked to your account."
+msgstr "شماره موبایل ثبت نشده است."
 
 msgid "No recorded test"
 msgstr "آزمایشی ثبت نشده"
@@ -358,14 +580,26 @@ msgstr "ارسال نشده"
 msgid "Older events"
 msgstr "رویدادهای قدیمی‌تر"
 
+msgid "Only new accounts see these fields after mobile verification. Native required fields and checkout validation remain unchanged."
+msgstr "این فیلدها فقط برای حساب‌های جدید پس از تأیید موبایل نمایش داده می‌شوند. فیلدهای الزامی بومی و اعتبارسنجی تسویه‌حساب تغییر نمی‌کنند."
+
+msgid "Only ordinary accounts with a previously verified number can reset their password using a new recovery code."
+msgstr "فقط حساب‌های عادی دارای شماره از قبل تأییدشده می‌توانند با کد بازیابی جدید رمز خود را تعیین کنند."
+
 msgid "Only the active provider sends customer verification messages. Configuring another provider does not switch it."
 msgstr "فقط ارائه‌دهنده فعال پیامک تأیید مشتریان را ارسال می‌کند. پیکربندی ارائه‌دهنده دیگر، گزینه فعال را تغییر نمی‌دهد."
+
+msgid "Open Media Library"
+msgstr "باز کردن کتابخانه رسانه"
 
 msgid "Open administration over HTTPS to enter provider credentials."
 msgstr "برای واردکردن اطلاعات اتصال، مدیریت سایت را از طریق HTTPS باز کنید."
 
 msgid "Operation"
 msgstr "عملیات"
+
+msgid "Optional"
+msgstr "اختیاری"
 
 msgid "Optional purpose-specific messages"
 msgstr "پیام‌های اختصاصی هر کاربرد (اختیاری)"
@@ -375,6 +609,24 @@ msgstr "روش‌های اختیاری بازیابی حساب"
 
 msgid "Ordinary SMS"
 msgstr "پیامک عادی"
+
+msgid "Password"
+msgstr "رمز عبور"
+
+msgid "Password reset by email"
+msgstr "بازیابی رمز با ایمیل"
+
+msgid "Password reset by email is unavailable for this account."
+msgstr "بازیابی رمز با ایمیل برای این حساب در دسترس نیست."
+
+msgid "Password reset by verified mobile"
+msgstr "بازیابی رمز با موبایل تأییدشده"
+
+msgid "Password reset with this mobile number is unavailable. Use another permitted method or contact support."
+msgstr "بازیابی رمز با این شماره امکان‌پذیر نیست. از روش مجاز دیگری استفاده کنید یا با پشتیبانی تماس بگیرید."
+
+msgid "Password sign-in is unavailable for this account. Use your verified mobile number or contact support."
+msgstr "ورود با رمز عبور برای این حساب امکان‌پذیر نیست. از شماره موبایل تأییدشده استفاده کنید یا با پشتیبانی تماس بگیرید."
 
 msgid "Passwords do not match."
 msgstr "رمزهای عبور یکسان نیستند."
@@ -387,6 +639,9 @@ msgstr "مقادیر الگو به ترتیب"
 
 msgid "Pending email expiry (UTC)"
 msgstr "انقضای تأیید ایمیل در انتظار (UTC)"
+
+msgid "Pending mobile verification"
+msgstr "در انتظار احراز شماره موبایل"
 
 msgid "Pending recovery email"
 msgstr "ایمیل بازیابی در انتظار تأیید"
@@ -406,8 +661,20 @@ msgstr "برای ادامه خرید، وارد حساب خود شوید و شم
 msgid "Please sign in using your existing account credentials."
 msgstr "لطفاً با اطلاعات ورود به حساب فعلی خود وارد شوید."
 
+msgid "Please start again."
+msgstr "لطفاً دوباره شروع کنید."
+
 msgid "Preview reviewed Digits identities"
 msgstr "پیش‌نمایش هویت‌های بررسی‌شده Digits"
+
+msgid "Preview source=digits directly on the site, or supply a complete reviewed evidence/rows manifest. Check all source conflicts; no possession is asserted."
+msgstr "نگاشت‌های Digits را مستقیماً در سایت پیش‌نمایش کنید (source=digits) یا فهرست کامل بررسی‌شده را با evidence/rows ارسال کنید. همه تعارض‌های منبع بررسی می‌شوند؛ مالکیت شماره تأیید نمی‌شود."
+
+msgid "Preview width"
+msgstr "اندازه پیش‌نمایش"
+
+msgid "Privacy policy"
+msgstr "حریم خصوصی"
 
 msgid "Provider"
 msgstr "ارائه‌دهنده"
@@ -451,8 +718,23 @@ msgstr "شماره موبایل گیرنده"
 msgid "Reconcile an interrupted registration"
 msgstr "تکمیل کنترل‌شده ثبت‌نام نیمه‌تمام"
 
+msgid "Recover your existing account"
+msgstr "بازیابی حساب فعلی"
+
 msgid "Recovery email"
 msgstr "ایمیل بازیابی"
+
+msgid "Register"
+msgstr "ثبت‌نام"
+
+msgid "Register with email"
+msgstr "ثبت‌نام با ایمیل"
+
+msgid "Registration preview"
+msgstr "پیش‌نمایش ثبت‌نام"
+
+msgid "Registration with email is disabled. Register with your mobile number."
+msgstr "ثبت‌نام با ایمیل غیرفعال است. با شماره موبایل ثبت‌نام کنید."
 
 msgid "Release an unstarted registration"
 msgstr "آزادسازی رزرو ثبت‌نام شروع‌نشده"
@@ -466,14 +748,41 @@ msgstr "حذف پیکربندی"
 msgid "Remove saved provider configuration"
 msgstr "حذف پیکربندی ذخیره‌شده ارائه‌دهنده"
 
+msgid "Request another link"
+msgstr "درخواست پیوند جدید"
+
+msgid "Require mobile verification in each checkout session"
+msgstr "الزام احراز مجدد موبایل در نشست پرداخت"
+
 msgid "Require verified mobile at checkout"
 msgstr "الزام تأیید موبایل برای خرید"
+
+msgid "Required"
+msgstr "الزامی"
 
 msgid "Resend interval (seconds)"
 msgstr "فاصله ارسال مجدد (ثانیه)"
 
+msgid "Reset by email"
+msgstr "بازیابی با ایمیل"
+
+msgid "Reset by mobile"
+msgstr "بازیابی با موبایل"
+
 msgid "Reset filters"
 msgstr "پاک‌کردن فیلترها"
+
+msgid "Reset password"
+msgstr "بازیابی رمز عبور"
+
+msgid "Reset password by email"
+msgstr "بازیابی رمز عبور با ایمیل"
+
+msgid "Reset password by mobile"
+msgstr "بازیابی رمز عبور با موبایل"
+
+msgid "Reset to inherited appearance"
+msgstr "بازنشانی به ظاهر ارث‌بری‌شده"
 
 msgid "Result"
 msgstr "نتیجه"
@@ -483,6 +792,9 @@ msgstr "مدت نگهداری (ساعت)"
 
 msgid "Retry request"
 msgstr "تلاش مجدد"
+
+msgid "Return to account details"
+msgstr "بازگشت به جزئیات حساب"
 
 msgid "SMS"
 msgstr "پیامک"
@@ -507,6 +819,9 @@ msgstr "پیش از انتخاب یا فعال‌سازی، پیکربندی ک�
 
 msgid "Save changes"
 msgstr "ذخیره تغییرات"
+
+msgid "Save each changed form before leaving this tab."
+msgstr "پیش از خروج از این تب، تغییرات هر فرم را جداگانه ذخیره کنید."
 
 msgid "Save password"
 msgstr "ذخیره رمز عبور"
@@ -535,6 +850,9 @@ msgstr "اطلاعات اتصال ذخیره‌شده نمایش داده نمی
 msgid "Saved — leave blank to keep"
 msgstr "ذخیره شده؛ برای حفظ مقدار خالی بگذارید"
 
+msgid "Select an image from the Media Library by its attachment ID."
+msgstr "تصویر را با شناسه پیوست آن از کتابخانه رسانه انتخاب کنید."
+
 msgid "Send a new code"
 msgstr "ارسال مجدد کد"
 
@@ -543,6 +861,9 @@ msgstr "ارسال پیامک آزمایشی"
 
 msgid "Send confirmation link"
 msgstr "ارسال لینک تأیید"
+
+msgid "Send password reset link"
+msgstr "ارسال پیوند تعیین رمز"
 
 msgid "Send test SMS"
 msgstr "ارسال پیامک آزمایشی"
@@ -553,11 +874,20 @@ msgstr "شماره فرستنده"
 msgid "Sending method"
 msgstr "روش ارسال"
 
+msgid "Set a new password"
+msgstr "تعیین رمز عبور جدید"
+
 msgid "Settings changed in another request. Reload and reconcile your edits before saving again."
 msgstr "تنظیمات در درخواست دیگری تغییر کرده‌اند. پیش از ذخیره مجدد، تنظیمات جدید را بارگذاری و تغییرات را تطبیق دهید."
 
+msgid "Settings could not be loaded. Try again."
+msgstr "تنظیمات بارگذاری نشد. دوباره تلاش کنید."
+
 msgid "Settings saved."
 msgstr "تنظیمات ذخیره شد."
+
+msgid "Show password"
+msgstr "نمایش رمز عبور"
 
 msgid "Sign in"
 msgstr "ورود"
@@ -568,20 +898,47 @@ msgstr "ورود یا ثبت‌نام"
 msgid "Sign in or register with email"
 msgstr "ورود یا ثبت‌نام با ایمیل"
 
+msgid "Sign in to your account"
+msgstr "ورود به حساب کاربری"
+
 msgid "Sign in with email or username"
 msgstr "ورود با ایمیل یا نام کاربری"
+
+msgid "Sign in with mobile"
+msgstr "ورود با موبایل"
+
+msgid "Sign in with password"
+msgstr "ورود با رمز عبور"
+
+msgid "Sign-in and recovery"
+msgstr "ورود و بازیابی"
 
 msgid "Sign-in and registration"
 msgstr "ورود و ثبت‌نام"
 
+msgid "Site logo"
+msgstr "لوگوی سایت"
+
+msgid "Site name"
+msgstr "نام سایت"
+
 msgid "Some account data could not be erased. Review and retry the privacy request."
 msgstr "بخشی از اطلاعات حساب قابل پاک‌سازی نبود. درخواست حریم خصوصی را بررسی و دوباره اجرا کنید."
+
+msgid "Standalone background color"
+msgstr "رنگ پس‌زمینه صفحه مستقل"
+
+msgid "Stay on this tab"
+msgstr "ماندن در این تب"
 
 msgid "Stored mobile session proofs"
 msgstr "تأییدهای ذخیره‌شده موبایل نشست‌ها"
 
 msgid "Template name"
 msgstr "نام الگو"
+
+msgid "Terms and conditions"
+msgstr "قوانین و شرایط"
 
 msgid "Test connection"
 msgstr "آزمایش اتصال"
@@ -628,8 +985,17 @@ msgstr "صحت فایل دانلودشده تأیید نشد. هیچ به‌رو
 msgid "The message may have been sent. Enter the code if you receive it."
 msgstr "ممکن است پیامک ارسال شده باشد. اگر کد را دریافت کردید، آن را وارد کنید."
 
+msgid "The mobile identity was retained because removing it could prevent account recovery. Arrange another native recovery method or delete the account explicitly."
+msgstr "هویت موبایل حفظ شد، زیرا حذف آن ممکن است مانع بازیابی حساب شود. روش بازیابی بومی دیگری فراهم کنید یا حساب را به‌صورت صریح حذف کنید."
+
 msgid "The operation could not be confirmed. Check diagnostics before repeating an external action."
 msgstr "نتیجه عملیات قابل تأیید نبود. قبل از تکرار عملیات خارجی، عیب‌یابی را بررسی کنید."
+
+msgid "The order mobile was updated. Review the order and select Pay again."
+msgstr "شماره موبایل سفارش تغییر کرد. سفارش را بررسی کنید و دوباره پرداخت را انتخاب کنید."
+
+msgid "The password change result is uncertain. Try signing in with the new password or restart recovery."
+msgstr "نتیجه تعیین رمز مشخص نیست. با رمز جدید ورود را امتحان کنید یا دوباره مسیر بازیابی را آغاز کنید."
 
 msgid "The password could not be updated. Please try again later."
 msgstr "رمز عبور به‌روزرسانی نشد. بعداً دوباره تلاش کنید."
@@ -652,14 +1018,23 @@ msgstr "اطلاعات نسخه انتشار قابل تأیید نبود. GitHu
 msgid "The request is invalid. Please start again."
 msgstr "درخواست نامعتبر است. دوباره شروع کنید."
 
+msgid "The request result is uncertain. Continue to check your account before trying again."
+msgstr "نتیجه درخواست مشخص نیست. پیش از تلاش مجدد، وضعیت حساب را بررسی کنید."
+
 msgid "The requested account operation could not be completed. Check the error code and field."
 msgstr "عملیات درخواستی کامل نشد. کد خطا و فیلد مربوط را بررسی کنید."
+
+msgid "The save result is uncertain. Reload saved settings before trying again."
+msgstr "نتیجه ذخیره نامشخص است. پیش از تلاش مجدد، تنظیمات ذخیره‌شده را دوباره بارگذاری کنید."
+
+msgid "The selected account methods also respect native WordPress and WooCommerce registration settings."
+msgstr "روش‌های انتخاب‌شده تابع تنظیمات ثبت‌نام WordPress و WooCommerce نیز هستند."
 
 msgid "The update package is not a recognized release."
 msgstr "بسته به‌روزرسانی یک نسخه انتشار معتبر نیست."
 
-msgid "The mobile identity was retained because removing it could prevent account recovery. Arrange another native recovery method or delete the account explicitly."
-msgstr "هویت موبایل حفظ شد، زیرا حذف آن ممکن است مانع بازیابی حساب شود. روش بازیابی بومی دیگری فراهم کنید یا حساب را به‌صورت صریح حذف کنید."
+msgid "This account method is unavailable."
+msgstr "این روش دسترسی به حساب در دسترس نیست."
 
 msgid "This email address is not available for this account."
 msgstr "این آدرس ایمیل برای این حساب قابل استفاده نیست."
@@ -697,6 +1072,9 @@ msgstr "تعداد درخواست‌ها بیش از حد مجاز است. بع�
 msgid "Try again"
 msgstr "تلاش مجدد"
 
+msgid "Unavailable"
+msgstr "در دسترس نیست"
+
 msgid "Uncertain"
 msgstr "نامشخص"
 
@@ -708,6 +1086,9 @@ msgstr "به‌روزرسانی تنظیمات غیرمحرمانه با نسخ�
 
 msgid "Use a separate message"
 msgstr "استفاده از پیام اختصاصی"
+
+msgid "Use account mobile for this order"
+msgstr "استفاده از شماره حساب در سفارش"
 
 msgid "Use at least 15 characters and enter the same password twice."
 msgstr "از حداقل ۱۵ نویسه استفاده کنید و رمز عبور را دو بار یکسان وارد کنید."
@@ -721,6 +1102,12 @@ msgstr "برای افزودن یا تغییر ایمیل حساب از بخش ب
 msgid "Use the default message unless an operation needs a different template."
 msgstr "از پیام پیش‌فرض استفاده کنید، مگر اینکه عملیات به الگوی متفاوتی نیاز داشته باشد."
 
+msgid "Use the mobile number linked to your account, or manage your account mobile number first."
+msgstr "شماره موبایل سفارش با شماره تأییدشده حساب شما یکسان نیست."
+
+msgid "Use the native email reset link. Independent of email sign-in."
+msgstr "استفاده از پیوند بومی تعیین رمز؛ مستقل از ورود با ایمیل."
+
 msgid "Use the optional recovery options to add or change your email."
 msgstr "برای افزودن یا تغییر ایمیل از روش‌های اختیاری بازیابی حساب استفاده کنید."
 
@@ -732,6 +1119,9 @@ msgstr "با شماره موبایل وارد حساب خود شوید."
 
 msgid "Used"
 msgstr "مصرف‌شده"
+
+msgid "Username"
+msgstr "نام کاربری"
 
 msgid "Username for native sign-in:"
 msgstr "نام کاربری برای ورود با رمز عبور:"
@@ -751,11 +1141,11 @@ msgstr "الگوی تأیید"
 msgid "Verification policy"
 msgstr "تنظیمات تأیید"
 
-msgid "Identity source"
-msgstr "منبع هویت"
-
 msgid "Verification state:"
 msgstr "وضعیت تأیید:"
+
+msgid "Verification successful"
+msgstr "تأیید موفق"
 
 msgid "Verification time (UTC)"
 msgstr "زمان تأیید (UTC)"
@@ -772,14 +1162,26 @@ msgstr "هویت تأییدشده موبایل و یکپارچگی با حساب
 msgid "Verified mobile number"
 msgstr "شماره موبایل تأییدشده"
 
+msgid "Verified — %s"
+msgstr "احراز شده — %s"
+
 msgid "Verified. Continuing…"
-msgstr "تأیید شد. در حال ادامه…"
+msgstr "در حال انتقال به صفحه مقصد…"
 
 msgid "Verify a mobile number for your current account."
 msgstr "یک شماره موبایل برای حساب فعلی خود تأیید کنید."
 
 msgid "Verify and continue"
 msgstr "تأیید و ادامه"
+
+msgid "Verify and continue to payment"
+msgstr "تأیید و ادامه پرداخت"
+
+msgid "Verify mobile number"
+msgstr "تأیید شماره موبایل"
+
+msgid "Verify recovery code"
+msgstr "تأیید کد بازیابی"
 
 msgid "Verify your mobile to continue checkout"
 msgstr "تأیید موبایل برای ادامه خرید"
@@ -796,6 +1198,12 @@ msgstr "مشاهده جزئیات"
 msgid "We could not finish creating your account. Please contact support before trying again."
 msgstr "ایجاد حساب شما کامل نشد. پیش از تلاش دوباره با پشتیبانی تماس بگیرید."
 
+msgid "When checkout verification is required, enable this to require mobile proof in the current login session. When off, a signed-in customer with a previously verified mobile can pay without another SMS."
+msgstr "در صورت الزام احراز موبایل برای پرداخت، با فعال‌کردن این گزینه احراز شماره در نشست ورود فعلی الزامی است. در حالت غیرفعال، مشتری واردشده با شماره موبایل قبلاً احرازشده بدون پیامک مجدد پرداخت می‌کند."
+
+msgid "When off, an actual username can still be used with a password. This does not disable email password recovery."
+msgstr "با غیرفعال شدن این گزینه، ورود با نام کاربری و رمز همچنان ممکن است. بازیابی رمز با ایمیل غیرفعال نمی‌شود."
+
 msgid "WooCommerce My Account registration"
 msgstr "ثبت‌نام در حساب کاربری ووکامرس"
 
@@ -804,6 +1212,9 @@ msgstr "ثبت‌نام در صفحه خرید ووکامرس"
 
 msgid "WooCommerce must be active to enable this checkout requirement."
 msgstr "برای فعال‌سازی الزام تأیید در خرید، ووکامرس باید فعال باشد."
+
+msgid "WordPress"
+msgstr "WordPress"
 
 msgid "WordPress registration"
 msgstr "ثبت‌نام وردپرس"
@@ -817,14 +1228,26 @@ msgstr "شما وارد حساب خود شده‌اید."
 msgid "You do not have permission to manage these settings."
 msgstr "شما اجازه مدیریت این تنظیمات را ندارید."
 
+msgid "You have unsaved changes."
+msgstr "تغییرات ذخیره‌نشده دارید."
+
 msgid "Your account or mobile number changed. Please start again."
 msgstr "حساب یا شماره موبایل شما تغییر کرده است. دوباره شروع کنید."
 
+msgid "Your checkout has changed. Review your order and select Pay again."
+msgstr "شماره موبایل تأیید شد. مبلغ یا اطلاعات پرداخت تغییر کرده است؛ سفارش را بررسی کنید و دوباره پرداخت را انتخاب کنید."
+
+msgid "Your mobile number is not verified."
+msgstr "شماره موبایل تأیید نشده است."
+
 msgid "Your mobile number is verified."
-msgstr "شماره موبایل شما تأیید شده است."
+msgstr "شماره موبایل تأیید شده است."
 
 msgid "Your mobile sign-in remains available. Add an email or password only if you want another way to access your account."
 msgstr "ورود با موبایل همچنان امکان‌پذیر است. فقط اگر روش دیگری برای دسترسی به حساب می‌خواهید، ایمیل یا رمز عبور اضافه کنید."
+
+msgid "Your password was reset. Sign in again."
+msgstr "رمز عبور تغییر کرد. دوباره وارد حساب شوید."
 
 msgid "Your password was saved."
 msgstr "رمز عبور شما ذخیره شد."
@@ -832,134 +1255,5 @@ msgstr "رمز عبور شما ذخیره شد."
 msgid "Your verification code: {code}"
 msgstr "کد تأیید شما: {code}"
 
-msgid "%s — Sign in"
-msgstr "%s — ورود"
-
-msgid "Allow eligible accounts to sign in with an SMS code."
-msgstr "اجازه ورود به حساب‌های مجاز با کد پیامکی."
-
-msgid "Allow native public email registration where the site permits it."
-msgstr "ثبت‌نام عمومی با ایمیل در صورت مجاز بودن در تنظیمات سایت."
-
-msgid "An existing account uses this email address. Recover that account before creating another account."
-msgstr "حسابی با این ایمیل وجود دارد. برای جلوگیری از ساخت حساب تکراری، ابتدا حساب فعلی خود را بازیابی کنید."
-
-msgid "Back to site"
-msgstr "بازگشت به سایت"
-
-msgid "Cancel verification"
-msgstr "لغو تأیید شماره"
-
-msgid "Check your email to complete registration."
-msgstr "برای تکمیل ثبت‌نام ایمیل خود را بررسی کنید."
-
-msgid "Checking…"
-msgstr "در حال بررسی…"
-
-msgid "Complete the required field."
-msgstr "فیلد ضروری را تکمیل کنید."
-
-msgid "Confirm your existing account credentials and verify a mobile number to keep your account."
-msgstr "اطلاعات ورود به حساب فعلی خود را تأیید کنید و شماره موبایل را احراز کنید تا همان حساب حفظ شود."
-
-msgid "Continue with mobile number"
-msgstr "ادامه با شماره موبایل"
-
-msgid "Customer password sign-in"
-msgstr "ورود مشتری با رمز عبور"
-
-msgid "Email address"
-msgstr "آدرس ایمیل"
-
-msgid "Email or username"
-msgstr "ایمیل یا نام کاربری"
-
-msgid "Email registration"
-msgstr "ثبت‌نام با ایمیل"
-
-msgid "Enable mobile sign-in or keep password sign-in available to customers."
-msgstr "ورود با موبایل را فعال کنید یا امکان ورود مشتریان با رمز عبور را حفظ کنید."
-
-msgid "Enter a valid mobile number before payment."
-msgstr "پیش از پرداخت شماره موبایل معتبری وارد کنید."
-
-msgid "Forgot password?"
-msgstr "رمز عبور را فراموش کرده‌اید؟"
-
-msgid "Keep password sign-in available to ordinary customers. Administrators and other privileged accounts retain native access. Check access for customers without a mobile number before disabling."
-msgstr "ورود مشتریان عادی با رمز عبور را فعال نگه دارید. دسترسی بومی مدیران و حساب‌های دارای دسترسی ویژه حفظ می‌شود. پیش از غیرفعال‌سازی، دسترسی مشتریان بدون شماره موبایل را بررسی کنید."
-
-msgid "Mobile verification"
-msgstr "احراز شماره موبایل"
-
-msgid "Mobile verified, but checkout could not be refreshed. Select Pay to try again."
-msgstr "شماره موبایل تأیید شد اما به‌روزرسانی سفارش انجام نشد. برای تلاش مجدد دکمه پرداخت را بزنید."
-
-msgid "Mobile verified. Review your order and select Pay to continue."
-msgstr "شماره موبایل تأیید شد. سفارش را بررسی کنید و برای ادامه دکمه پرداخت را بزنید."
-
-msgid "No mobile number"
-msgstr "بدون شماره موبایل"
-
-msgid "Password"
-msgstr "رمز عبور"
-
-msgid "Password sign-in is unavailable for this account. Use your verified mobile number or contact support."
-msgstr "ورود با رمز عبور برای این حساب امکان‌پذیر نیست. از شماره موبایل تأییدشده استفاده کنید یا با پشتیبانی تماس بگیرید."
-
-msgid "Pending mobile verification"
-msgstr "در انتظار احراز شماره موبایل"
-
-msgid "Please start again."
-msgstr "لطفاً دوباره شروع کنید."
-
-msgid "Privacy policy"
-msgstr "حریم خصوصی"
-
-msgid "Recover your existing account"
-msgstr "بازیابی حساب فعلی"
-
-msgid "Register"
-msgstr "ثبت‌نام"
-
-msgid "Register with email"
-msgstr "ثبت‌نام با ایمیل"
-
-msgid "Registration with email is disabled. Register with your mobile number."
-msgstr "ثبت‌نام با ایمیل غیرفعال است. با شماره موبایل ثبت‌نام کنید."
-
-msgid "Sign in with mobile"
-msgstr "ورود با موبایل"
-
-msgid "Terms and conditions"
-msgstr "قوانین و شرایط"
-
-msgid "The selected account methods also respect native WordPress and WooCommerce registration settings."
-msgstr "روش‌های انتخاب‌شده تابع تنظیمات ثبت‌نام WordPress و WooCommerce نیز هستند."
-
-msgid "Unavailable"
-msgstr "در دسترس نیست"
-
-msgid "Use the mobile number linked to your account, or manage your account mobile number first."
-msgstr "از شماره موبایل متصل به حساب خود استفاده کنید یا ابتدا شماره موبایل حساب را مدیریت کنید."
-
-msgid "Username"
-msgstr "نام کاربری"
-
-msgid "Verified — %s"
-msgstr "احراز شده — %s"
-
-msgid "Verify and continue to payment"
-msgstr "تأیید و ادامه پرداخت"
-
-msgid "Your checkout has changed. Review your order and select Pay again."
-msgstr "اطلاعات سفارش تغییر کرده است. سفارش را بررسی کنید و دوباره دکمه پرداخت را بزنید."
-
-msgid "Customers must sign in and have a verified mobile before payment."
-msgstr "مشتریان پیش از پرداخت باید وارد حساب شده و شماره موبایل احرازشده داشته باشند."
-
-msgid "Require mobile verification in each checkout session"
-msgstr "الزام احراز مجدد موبایل در نشست پرداخت"
-
-msgid "When checkout verification is required, enable this to require mobile proof in the current login session. When off, a signed-in customer with a previously verified mobile can pay without another SMS."
-msgstr "در صورت الزام احراز موبایل برای پرداخت، با فعال‌کردن این گزینه احراز شماره در نشست ورود فعلی الزامی است. در حالت غیرفعال، مشتری واردشده با شماره موبایل قبلاً احرازشده بدون پیامک مجدد پرداخت می‌کند."
+msgid "Zero inherits the site font. A local WOFF or WOFF2 attachment is supported."
+msgstr "صفر به معنی ارث‌بری فونت سایت است. پیوست محلی WOFF یا WOFF2 پشتیبانی می‌شود."

@@ -139,6 +139,7 @@ fi
 "$php_bin" "$repo/tests/standalone.php"
 "$php_bin" "$repo/tests/woocommerce.php"
 "$php_bin" "$repo/tests/accounts.php"
+"$php_bin" "$repo/tests/experience.php"
 "$php_bin" "$repo/tests/native-machine.php"
 "$php_bin" "$repo/tests/checkout.php"
 "$php_bin" "$repo/tests/purchase.php"

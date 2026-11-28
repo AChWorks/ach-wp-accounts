@@ -97,7 +97,7 @@ final class Abilities
         $providerIds = array_column(ProviderRegistry::capabilities(), 'id');
         $providerProperties = [
             'default' => self::route(),
-            'purposes' => self::object(array_fill_keys(['login','link','step_up'], self::route())),
+            'purposes' => self::object(array_fill_keys(['login','link','step_up','password_reset'], self::route())),
         ];
         if ($output) {
             $providerProperties['configured_inputs'] = self::list(self::enum(['api_key','username']));
@@ -109,12 +109,16 @@ final class Abilities
             'verifyHourly' => self::integer(1, 100),
         ] + array_fill_keys(['mobileHourly','networkHourly','siteHourly','siteDaily'], self::integer(1, 4294967295));
         $result = [
-            'auth_enabled' => ['type'=>'boolean'],
-            'allow_registration' => ['type'=>'boolean'],
-            'allow_email_registration' => ['type'=>'boolean'],
-            'allow_password_login' => ['type'=>'boolean'],
-            'checkout_required' => ['type'=>'boolean'],
-            'checkout_reverify' => ['type'=>'boolean'],
+            ...array_fill_keys(Settings::booleanKeys(),['type'=>'boolean']),
+            'registration_fields' => self::object(array_fill_keys(['first_name','last_name'],self::enum(['off','optional','required'])), $output ? ['first_name','last_name'] : []),
+            'appearance' => self::object([
+                'logo_mode'=>self::enum(['inherit','name','custom']),
+                'logo_id'=>self::integer(),
+                'font_id'=>self::integer(),
+                'accent'=>self::string(),
+                'background'=>self::string(),
+                'radius'=>['type'=>['integer','null'],'minimum'=>0,'maximum'=>64],
+            ],$output ? ['logo_mode','logo_id','font_id','accent','background','radius'] : []),
             'selected_provider' => self::enum(['',...$providerIds]),
             'providers' => self::object(array_fill_keys($providerIds, $provider)),
             'verification' => self::object($policy, $output ? array_keys($policy) : []),
@@ -265,7 +269,7 @@ final class Abilities
         self::registerOne('provider-test-send', __('Send a test SMS', 'ach-wp-accounts'),
             __('Explicitly send one potentially billable test message with the saved template. Requires confirmation and a unique request ID; exact replay is safe for the 24-hour challenge retention. The test cannot authenticate a customer.', 'ach-wp-accounts'),
             self::object([
-                'provider'=>$provider, 'revision'=>self::string(), 'mobile'=>self::string(), 'purpose'=>self::enum(['login','link','step_up']),
+                'provider'=>$provider, 'revision'=>self::string(), 'mobile'=>self::string(), 'purpose'=>self::enum(['login','link','step_up','password_reset']),
                 'request_id'=>['type'=>'string','pattern'=>'^[0-9a-f]{32}$'],
                 'confirm_send'=>['type'=>'boolean'],
             ], ['mobile','purpose','request_id','confirm_send']),
@@ -276,7 +280,7 @@ final class Abilities
             self::object([
                 'category'=>self::enum(['sms','connection','account']), 'provider'=>$provider,
                 'state'=>self::enum(['accepted','failed','uncertain']),
-                'purpose'=>self::enum(['login','link','step_up','test_login','test_link','test_step_up','start','issue','complete','recovery_email','recovery_password']),
+                'purpose'=>self::enum(['login','link','step_up','password_reset','test_login','test_link','test_step_up','test_password_reset','start','issue','complete','continue_registration','reset_password','recovery_email','recovery_password']),
                 'from'=>self::integer(), 'to'=>self::integer(), 'cursor'=>self::string(),
                 'limit'=>self::integer(1,100), 'correlation_id'=>['type'=>'string','pattern'=>'^[0-9a-f]{32}$'],
             ]), self::object(['items'=>self::list(self::event()),'next_cursor'=>['type'=>['string','null']]], ['items','next_cursor']),

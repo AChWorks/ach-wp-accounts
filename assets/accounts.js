@@ -9,7 +9,9 @@
         }
     }
 
+    const controllers = new WeakMap();
     function initialize(root) {
+        if (controllers.has(root)) return;
         const get = (name) => root.querySelector('[data-ach-' + name + ']');
         const strings = JSON.parse(root.dataset.strings);
         const form = get('form');
@@ -24,10 +26,15 @@
         const desc = get('description');
         const current = get('current');
         const surface = root.dataset.surface;
+        const initialPurpose=root.dataset.initialPurpose||'login';
+        const initialCapabilities=JSON.parse(root.dataset.capabilities||'{}');
         let model = null;
-        let purpose = 'login';
+        let purpose = initialPurpose;
         let phase = 'start';
         let ticket = '';
+        let proof = '';
+        let profileIntent = '';
+        let disposed = false;
         let masked = '';
         let busy = false;
         let resendAt = 0;
@@ -42,6 +49,8 @@
         let needsReconcile = false;
         let paymentRevision = 0;
         let pageAuthenticated = document.body.classList.contains('logged-in');
+        controllers.set(root,()=>{disposed=true;stopTimer();ticket='';proof='';password.value='';code.value='';});
+        const capabilities=()=>model?.capabilities||initialCapabilities;
 
         function classicForm() {
             return kind === 'order-pay' ? document.querySelector('form#order_review') : document.querySelector('form.checkout');
@@ -170,14 +179,16 @@
             if (get('recover')) get('recover').hidden = true;
             if (get('reset')) get('reset').hidden = true;
             if (get('profile-link')) get('profile-link').hidden = true;
+            if (get('use-account-mobile')) get('use-account-mobile').hidden=true;
             stopTimer();
-            ticket = '';
+            ticket = '';proof='';
             code.value = '';
             password.value = '';
             form.hidden = true;
             get('retry').hidden = true;
             if (allowed) root.hidden = true;
             else if (message) {
+                clearSuccess();get('cancel').hidden=false;
                 reveal();
                 announce(message, true);
             }
@@ -301,8 +312,10 @@
             if (refreshing) return Promise.resolve(false);
             let resolve;
             const promise = new Promise(done => { resolve = done; });
+            get('cancel').hidden=false;
             const attempt = { promise, resolve, snapshot: snapshot(), mobile: billingMobile(), userId: 0, paymentRevision };
             if (get('profile-link')) get('profile-link').hidden = true;
+            if (get('use-account-mobile')) get('use-account-mobile').hidden=true;
             get('retry').hidden = true;
             pending = attempt;
             (async () => {
@@ -321,6 +334,7 @@
                     if (!model.phone_matches) {
                         finishPayment(false, strings.checkout_mismatch);
                         if (get('profile-link')) get('profile-link').hidden = false;
+                        if (get('use-account-mobile') && model.account_mobile && kind!=='order-pay') get('use-account-mobile').hidden=false;
                         return;
                     }
                     mobile.value = attempt.mobile;
@@ -353,6 +367,23 @@
             };
             document.addEventListener('input', paymentInput, true);
             document.addEventListener('change', paymentInput, true);
+            get('use-account-mobile')?.addEventListener('click',()=>{
+                if(!model?.authenticated||!model.account_mobile||pending||refreshing)return;
+                if(kind==='blocks'){
+                    const state=stores(),action=state?.data.dispatch(state.wc.cartStore);
+                    if(typeof action?.setBillingAddress!=='function'){announce(strings.checkout_mismatch,true);return;}
+                    action.setBillingAddress({...state.cart.getCustomerData().billingAddress,phone:model.account_mobile});
+                }else{
+                    const input=classicForm()?.querySelector('[name="billing_phone"]');
+                    if(!input)return;
+                    input.value=model.account_mobile;
+                    input.dispatchEvent(new Event('input',{bubbles:true}));
+                    input.dispatchEvent(new Event('change',{bubbles:true}));
+                }
+                get('use-account-mobile').hidden=true;
+                get('profile-link').hidden=true;
+                announce(strings.changed_billing);
+            });
             get('cancel').addEventListener('click', () => {
                 if (busy || refreshing) return;
                 finishPayment(false);
@@ -487,6 +518,7 @@
 
         function lock(value) {
             busy = value;
+            root.setAttribute('data-ach-busy',value?'1':'0');
             form.setAttribute('aria-busy', value ? 'true' : 'false');
             edit.disabled = value;
             if (checkout) get('cancel').disabled = value || refreshing;
@@ -494,6 +526,7 @@
             code.readOnly = value;
             password.readOnly = value;
             login.readOnly = value;
+            for(const input of root.querySelectorAll('[data-ach-name],[data-ach-reset-new],[data-ach-reset-confirm]')) input.readOnly=value;
             updateTimer();
         }
 
@@ -504,25 +537,49 @@
             }
         }
 
+        function clearContinuations() {
+            get('profile-fields').hidden=true;
+            for(const field of root.querySelectorAll('[data-ach-name-field]')){
+                field.hidden=true;const input=field.querySelector('input');
+                input.disabled=true;input.required=false;input.value='';
+            }
+            get('reset-fields').hidden=true;
+            for(const input of [get('reset-new'),get('reset-confirm')]){
+                input.disabled=true;input.required=false;input.value='';
+            }
+        }
+        function clearSuccess() {
+            get('success').hidden=true;
+            get('success-continue').hidden=true;
+            get('title').hidden=false;desc.hidden=false;
+        }
+        function hideMethods() {
+            for(const name of ['recover','reset','native-link','change','password-change','verify-profile','enroll','cancel-profile','retry']){
+                if(get(name))get(name).hidden=true;
+            }
+        }
         function mode(next, { focus = false, forcePassword = false } = {}) {
-            stopTimer();
+            stopTimer();clearSuccess();clearContinuations();hideMethods();
             purpose = next;
             forceLinkPassword = forcePassword;
+            const cap=capabilities();
             if (get('recover')) {
-                get('recover').hidden = model.authenticated;
+                get('recover').hidden = model.authenticated || !cap.first_link || !['recover','login'].includes(next);
                 get('recover').textContent = next === 'recover' ? strings.return_mobile : strings.recover;
-                get('reset').hidden = next !== 'recover';
+                get('reset').hidden = model.authenticated || !(cap.email_reset||cap.mobile_reset) || next==='password_reset';
             }
+            if(get('native-link'))get('native-link').hidden=model.authenticated||next!=='login';
             phase = 'start';
-            ticket = '';
+            ticket = '';proof='';
             masked = '';
             expiresAt = 0;
             resendAt = 0;
             code.value = '';
             password.value = '';
+            password.type='password';
             get('masked').textContent = '';
-            get('change').hidden = true;
-            get('password-change').hidden = !(surface === 'profile' && next === 'step_up');
+            get('password-change').hidden = !(surface === 'profile' && next === 'step_up' && profileIntent==='change');
+            get('cancel-profile').hidden=surface!=='profile';
             setField(get('mobile-field'), mobile, next !== 'step_up');
             setField(get('login-field'), login, next === 'recover');
             setField(get('password-field'), password, next === 'recover' || (next === 'link' && (forcePassword || !model.can_link)));
@@ -534,26 +591,27 @@
             edit.hidden = true;
             resend.hidden = true;
             if (surface === 'login') {
-                setTitle(model.registration_allowed ? strings.register : strings.login);
+                setTitle(next==='recover'?strings.recover_title:next==='password_reset'?strings.reset_title:
+                    model.registration_allowed ? strings.register : strings.login);
             }
-            desc.textContent = next === 'recover' ? strings.recover_description : next === 'login' ? strings.phone
+            desc.textContent = next === 'recover' ? strings.recover_description : next==='password_reset'?strings.reset_phone:next === 'login' ? strings.phone
                 : next === 'step_up' ? strings.step : model.has_mobile ? strings.change : strings.link;
             current.hidden = next !== 'step_up';
             current.querySelector('bdi').textContent = model.masked_mobile || '';
+            get('identity-icon').textContent='';
+            if(surface==='profile'&&get('recovery'))get('recovery').hidden=true;
             announce('');
             lock(false);
-            if (focus) {
-                (next === 'recover' ? login : next === 'step_up' ? submit : mobile).focus();
-            }
+            if (focus) (next === 'recover' ? login : next === 'step_up' ? submit : mobile).focus();
         }
 
         function codeMode(result) {
             phase = 'code';
             expiresAt = Date.now() + Math.max(0, Number(result.expires_in) || 0) * 1000;
             resendAt = Date.now() + Math.max(0, Number(result.retry_after) || 0) * 1000;
-            if (result.state === 'failed') {
-                phase = 'failed';
-            }
+            if (result.state === 'failed') phase = 'failed';
+            hideMethods();
+            if(surface==='profile')get('cancel-profile').hidden=false;
             setField(get('mobile-field'), mobile, false);
             setField(get('password-field'), password, false);
             setField(get('login-field'), login, false);
@@ -563,17 +621,59 @@
             current.hidden = true;
             desc.textContent = phase === 'failed' ? strings.failed : strings.sent;
             submit.hidden = phase === 'failed';
-            submit.textContent = checkout ? strings.verify_pay : strings.continue;
+            submit.textContent = checkout ? strings.verify_pay : purpose==='password_reset'?strings.reset_code:strings.continue;
             edit.hidden = purpose === 'step_up';
             resend.hidden = false;
             announce(result.state === 'uncertain' ? strings.uncertain : '');
             stopTimer();
             timer = window.setInterval(updateTimer, 1000);
             updateTimer();
-            if (phase === 'code') {
-                code.focus();
-            } else {
-                resend.focus();
+            if (phase === 'code') code.focus(); else resend.focus();
+        }
+
+        function continuationMode(result) {
+            stopTimer();hideMethods();clearContinuations();
+            proof=result.proof;phase=result.outcome==='profile_required'?'profile_fields':'reset_fields';
+            expiresAt=0;resendAt=0;code.value='';password.value='';
+            for(const [name,input] of [['mobile',mobile],['password',password],['login',login],['code',code]])setField(get(name+'-field'),input,false);
+            edit.hidden=true;resend.hidden=true;current.hidden=true;
+            if(phase==='profile_fields'){
+                if(!checkout)setTitle(strings.profile_required);
+                desc.textContent=strings.profile_required;get('profile-fields').hidden=false;
+                for(const node of root.querySelectorAll('[data-ach-name-field]')){
+                    const field=result.fields?.[node.dataset.achNameField],input=node.querySelector('input');
+                    node.hidden=!field;input.disabled=!field;input.required=field==='required'&&!checkout;
+                    input.dataset.achRequired=field==='required'?'1':'0';
+                }
+                submit.textContent=checkout?strings.verify_pay:strings.continue;
+                root.querySelector('[data-ach-name]:not(:disabled)')?.focus();
+            }else{
+                setTitle(strings.new_password);desc.textContent=strings.new_password;get('reset-fields').hidden=false;
+                for(const input of [get('reset-new'),get('reset-confirm')]){input.disabled=false;input.required=true;}
+                submit.textContent=strings.new_password;get('reset-new').focus();
+            }
+            announce('');
+        }
+
+        function successState(message, {redirect=false,reset=false}={}) {
+            stopTimer();hideMethods();clearContinuations();
+            phase='success';ticket='';proof='';code.value='';password.value='';
+            form.hidden=true;get('title').hidden=true;desc.hidden=true;current.hidden=true;
+            if(get('recovery'))get('recovery').hidden=true;
+            if(get('cancel'))get('cancel').hidden=true;
+            announce('');
+            const success=get('success');
+            get('success-title').textContent=strings.success_title;
+            get('success-message').textContent=message;
+            success.hidden=false;success.focus();
+            const link=get('success-continue');
+            if(reset){
+                // A reset does not sign in. Return to the ordinary login method.
+                const loginUrl=safeUrl(root.dataset.loginUrl||root.dataset.return);
+                link.href=loginUrl.href;link.textContent=strings.login;link.hidden=false;
+            }else if(redirect){
+                link.href=safeUrl(root.dataset.return).href;link.hidden=false;
+                window.location.assign(link.href);
             }
         }
 
@@ -604,13 +704,13 @@
                 password.value = '';
                 edit.hidden = purpose === 'step_up';
             }
-            if (error.code === 'existing_account_required') {
+            if (error.code === 'existing_account_required' && capabilities().first_link) {
                 mode('recover', { focus: true });
                 announce(error.message, true);
                 return;
             }
-            if (error.code === 'identity_changed' || error.code === 'invalid_context') {
-                ticket = '';
+            if (error.code === 'identity_changed' || error.code === 'invalid_context' || (['profile_fields','reset_fields'].includes(phase)&&error.code==='invalid_proof')) {
+                ticket = '';proof='';
                 get('retry').hidden = false;
                 submit.hidden = true;
                 resend.hidden = true;
@@ -618,44 +718,69 @@
             announce(error.message || strings.unavailable, true);
         }
 
+        async function completeOutcome(result) {
+            if(disposed)return;
+            if(result.outcome==='profile_required'||result.outcome==='password_required'){
+                continuationMode(result);return;
+            }
+            if(result.outcome==='password_reset'){
+                successState(strings.reset_done,{reset:true});return;
+            }
+            if(surface==='profile'){
+                if(profileIntent==='change' && purpose==='step_up'){
+                    model=await request('status');profileIntent='';mode('link',{focus:true});return;
+                }
+                if(profileIntent==='enroll' && purpose==='step_up'){
+                    profileIntent='';await load();get('recovery').open=true;get('recovery').querySelector('summary').focus();return;
+                }
+                profileIntent='';successState(strings.profile_saved);return;
+            }
+            if(checkout){
+                successState(strings.success);
+                await confirmPayment(true);
+            }else successState(strings.success,{redirect:true});
+        }
         async function submitFlow(event) {
             event.preventDefault();
-            if (busy || phase === 'failed' || (checkout && !pending)) return;
+            if (busy || disposed || root.closest('[data-ach-auth-shell],[data-ach-embedded]')?.getAttribute('aria-busy')==='true' || ['failed','success'].includes(phase) || (checkout && !pending)) return;
             if (checkout) {
-                for (const input of [mobile, login, password, code]) {
+                for (const input of [mobile,login,password,code,...root.querySelectorAll('[data-ach-name]')]) {
                     if (!input.disabled && input.dataset.achRequired === '1' && !input.value.trim()) {
-                        input.focus();
-                        announce(strings.required, true);
-                        return;
+                        input.focus();announce(strings.required,true);return;
                     }
                 }
             }
             lock(true);
             try {
                 if (phase === 'code') {
-                    await request('complete', { ticket, code: code.value });
-                    ticket = '';
-                    code.value = '';
-                    announce(strings.success);
-                    if (checkout) await confirmPayment(true);
-                    else window.location.assign(safeUrl(root.dataset.return).href);
-                    return;
+                    await completeOutcome(await request('complete', {ticket,code:code.value}));return;
+                }
+                if(phase==='profile_fields'){
+                    const names=Object.fromEntries([...root.querySelectorAll('[data-ach-name]:not(:disabled)')].map(input=>[input.dataset.achName,input.value]));
+                    await completeOutcome(await request('continue_registration',{ticket,proof,...names}));return;
+                }
+                if(phase==='reset_fields'){
+                    const next=get('reset-new'),confirm=get('reset-confirm');
+                    if(next.value!==confirm.value)throw new RequestError('invalid_password',strings.password_mismatch);
+                    await completeOutcome(await request('reset_password',{ticket,proof,new_password:next.value,confirmation:confirm.value}));return;
                 }
                 await send();
             } catch (error) {
-                if (phase === 'code' && error.code === 'network') {
+                if (['code','profile_fields'].includes(phase) && error.code === 'network') {
                     try {
-                        const observed = await request('status', checkout ? { mobile: billingMobile() || pending?.proofMobile || '' } : {});
+                        const observed = await request('status', checkout ? { mobile: billingMobile() || pending?.proofMobile || '' } :
+                            purpose==='link'?{mobile:mobile.value}:{});
                         if (observed.authenticated && observed.qualified &&
-                            (checkout || purpose === 'login' || purpose === 'step_up' || purpose === 'recover')) {
-                            if (checkout) await confirmPayment(true);
-                            else window.location.assign(safeUrl(root.dataset.return).href);
-                            return;
+                            (checkout || purpose === 'login' || purpose === 'step_up' || purpose === 'recover' ||
+                                (purpose==='link'&&observed.has_mobile&&observed.phone_matches))) {
+                            await completeOutcome({outcome:'verified'});return;
                         }
-                    } catch (_) {
-                        // No new send or verification request.
-                    }
+                    } catch (_) { /* No blind resend or mutation retry. */ }
                     get('retry').hidden = false;
+                }
+                if(phase==='reset_fields'&&error.code==='network'){
+                    clearContinuations();ticket='';proof='';form.hidden=true;get('retry').hidden=false;
+                    announce(strings.reset_uncertain,true);return;
                 }
                 failure(error);
             } finally {
@@ -684,6 +809,7 @@
         function configureRecovery() {
             const recovery = get('recovery');
             if (!recovery || !model.authenticated || !model.managed_account) return;
+            const cap=capabilities();
             const nativeEmail = document.querySelector('form.woocommerce-EditAccountForm #account_email');
             if (nativeEmail) {
                 nativeEmail.readOnly = true;
@@ -693,7 +819,10 @@
                 if (marker) marker.hidden = true;
                 nativeEmail.title = strings.manage_email;
             }
-            recovery.hidden = !model.recent_proof;
+            recovery.hidden = !model.recent_proof || !(cap.email_enrollment||cap.password_enrollment);
+            get('recovery-email').hidden=!cap.email_enrollment;
+            get('recovery-password').hidden=!cap.password_enrollment;
+            get('enroll').hidden=Boolean(model.recent_proof)||!model.has_mobile||!(cap.email_enrollment||cap.password_enrollment);
             get('email').value = model.recovery_email || '';
             get('username').textContent = model.native_username || '';
         }
@@ -737,33 +866,42 @@
             }
         }
 
+        function profileView() {
+            clearSuccess();clearContinuations();hideMethods();stopTimer();
+            phase='profile';ticket='';proof='';form.hidden=true;
+            desc.textContent=model.has_mobile?(model.mobile_verified?strings.verified:strings.unverified):strings.no_mobile;
+            current.hidden=!model.has_mobile;
+            current.querySelector('bdi').textContent=model.masked_mobile||'';
+            const icon=get('identity-icon');
+            icon.textContent=model.mobile_verified?'✓':model.has_mobile?'!':'';
+            icon.dataset.verified=model.mobile_verified?'1':'0';
+            get('change').hidden=!model.has_mobile;
+            get('verify-profile').hidden=Boolean(model.has_mobile&&model.mobile_verified);
+            get('verify-profile').textContent=model.has_mobile?strings.verify_mobile:strings.add_mobile;
+            configureRecovery();announce('');
+        }
         async function load() {
-            if (root.dataset.enabled !== '1') return;
+            if (root.dataset.enabled !== '1'||disposed) return;
             get('retry').hidden = true;
-            submit.hidden = false;
-            form.hidden = true;
+            clearSuccess();submit.hidden = false;
+            if(surface!=='login')form.hidden=true;
+            submit.disabled=true;
             announce('');
+            // Standalone guest document is emitted server-side, noncacheable,
+            // and already has effective public method policy. No status
+            // round trip is needed before rendering/using its initial form.
+            if(surface==='login'&&root.closest('[data-ach-auth-shell]')&&!model){
+                model={authenticated:false,registration_allowed:initialCapabilities.mobile_registration,capabilities:initialCapabilities};
+                mode(initialPurpose);return;
+            }
             try {
                 model = await request('status');
-                configureRecovery();
+                if(disposed)return;
                 if (model.authenticated) {
-                    const native = get('native-link');
-                    if (native) native.hidden = true;
-                    if (surface === 'login') {
-                        desc.textContent = strings.signed_in;
-                        return;
-                    }
-                    if (surface === 'profile' && model.has_mobile && model.recent_proof) {
-                        desc.textContent = strings.verified;
-                        current.hidden = false;
-                        current.querySelector('bdi').textContent = model.masked_mobile;
-                        get('change').hidden = false;
-                        return;
-                    }
-                    mode(model.has_mobile ? 'step_up' : 'link');
-                } else if (surface !== 'profile') {
-                    mode('login');
-                }
+                    const native = get('native-link');if(native)native.hidden=true;
+                    if(surface==='login'){form.hidden=true;hideMethods();desc.textContent=strings.signed_in;return;}
+                    if(surface==='profile'){profileView();return;}
+                } else if (surface !== 'profile') mode(initialPurpose);
             } catch (error) {
                 announce(error.message || strings.unavailable, true);
                 get('retry').hidden = false;
@@ -781,13 +919,25 @@
         });
         resend.addEventListener('click', repeat);
         get('recover')?.addEventListener('click', () => {
-            if (busy || refreshing || (checkout && !pending)) return;
+            if (busy || refreshing || !model || !capabilities().first_link || (checkout && !pending)) return;
             mode(purpose === 'recover' ? 'login' : 'recover', { focus: true });
         });
-        get('change').addEventListener('click', () => mode('link', { focus: true }));
+        get('change').addEventListener('click',()=>{
+            profileIntent='change';
+            mode(model.can_link?'link':'step_up',{focus:true});
+        });
+        get('verify-profile').addEventListener('click',()=>{profileIntent='';mode(model.has_mobile?'step_up':'link',{focus:true});});
+        get('cancel-profile').addEventListener('click',()=>{profileIntent='';profileView();});
+        get('enroll')?.addEventListener('click',()=>{profileIntent='enroll';mode('step_up',{focus:true});});
+        get('success-profile')?.addEventListener('click',()=>load());
+        get('toggle-password')?.addEventListener('click',event=>{
+            const visible=password.type==='password';password.type=visible?'text':'password';
+            event.currentTarget.setAttribute('aria-pressed',String(visible));
+        });
         get('password-change').addEventListener('click', () => mode('link', { focus: true, forcePassword: true }));
         get('retry').addEventListener('click', () => {
             if (checkout) finishPayment(false, strings.checkout_changed);
+            else if(surface==='login'&&model&&!model.authenticated)mode(initialPurpose,{focus:true});
             else load();
         });
         if (get('recovery')) {
@@ -798,21 +948,173 @@
         else load();
     }
 
+    // Ordinary method navigation uses the actual server-rendered shell.
+    // Native extension-owned forms can keep their ordinary POST/navigation.
+    let sequence=0;
+    const navigations=new WeakSet();
+    const drafts=new WeakMap();
+    const shellSelector='[data-ach-auth-shell],[data-ach-embedded]';
+    function local(raw){
+        const url=new URL(raw,location.href);
+        return url.origin===location.origin&&!url.username&&!url.password?url:null;
+    }
+    function shellFor(node){return node.closest(shellSelector);}
+    function shellMessage(shell,message){
+        let notice=shell.querySelector('[data-ach-navigation-status]');
+        if(!notice){
+            notice=document.createElement('p');notice.dataset.achNavigationStatus='1';
+            notice.setAttribute('role','status');notice.className='ach-auth-message';
+            shell.prepend(notice);
+        }
+        notice.hidden=!message;notice.textContent=message;
+    }
+    function shellStrings(shell){
+        try{return {...JSON.parse(shell.dataset.achStrings||'{}'),...JSON.parse(shell.querySelector('[data-ach-accounts]')?.dataset.strings||'{}')};}
+        catch(_){return {};}
+    }
+    function preserveDraft(shell){
+        const previous=drafts.get(shell)||{};
+        const mobile=shell.querySelector('[data-ach-mobile]'),login=shell.querySelector('[data-ach-login],input[autocomplete="username"]');
+        if(mobile&&mobile.value)previous.mobile=mobile.value;
+        if(login&&login.value)previous.login=login.value;
+        return previous;
+    }
+    function replaceIds(node){
+        const map=new Map(),prefix='ach-embedded-'+(++sequence)+'-';
+        for(const field of node.querySelectorAll('[id]')){map.set(field.id,prefix+field.id);field.id=prefix+field.id;}
+        for(const field of node.querySelectorAll('[for],[aria-labelledby],[aria-describedby],[data-ach-password-visibility]')){
+            for(const attr of ['for','aria-labelledby','aria-describedby','data-ach-password-visibility']){
+                if(field.hasAttribute(attr))field.setAttribute(attr,field.getAttribute(attr).split(/\s+/).map(x=>map.get(x)||x).join(' '));
+            }
+        }
+    }
+    function initializeWithin(shell){
+        shell.querySelectorAll('[data-ach-accounts]').forEach(initialize);
+    }
+    function installShell(shell,parsed,draft){
+        const embedded=shell.hasAttribute('data-ach-embedded');
+        for(const root of shell.querySelectorAll('[data-ach-accounts]'))controllers.get(root)?.();
+        const replacement=document.importNode(parsed,true);
+        if(embedded){
+            replacement.querySelector('.ach-auth-brand')?.remove();
+            replacement.querySelector('.ach-auth-legal')?.remove();
+            // Retain the original container and unique IDs. Do not import
+            // executable scripts or a second native document.
+            replaceIds(replacement);
+            shell.replaceChildren(...replacement.childNodes);
+            shell.dataset.achStrings=replacement.dataset.achStrings||'{}';
+            shell.dataset.achReturn=replacement.dataset.achReturn||'';
+        }else{
+            shell.replaceWith(replacement);shell=replacement;
+        }
+        drafts.set(shell,draft);
+        initializeWithin(shell);
+        const mobile=shell.querySelector('[data-ach-mobile]'),login=shell.querySelector('[data-ach-login],input[autocomplete="username"]');
+        if(mobile&&draft.mobile)mobile.value=draft.mobile;
+        if(login&&draft.login&&!login.value)login.value=draft.login;
+        const title=shell.querySelector('h2');
+        if(title){title.tabIndex=-1;title.focus({preventScroll:true});}
+        return shell;
+    }
+    async function navigateShell(shell,raw,{body=null,push=true}={}){
+        const url=local(raw);
+        if(!url||navigations.has(shell)||shell.querySelector('[data-ach-busy="1"]'))return;
+        const draft=preserveDraft(shell),strings=shellStrings(shell),embedded=shell.hasAttribute('data-ach-embedded');
+        const original=shell;
+        navigations.add(shell);shell.setAttribute('aria-busy','true');
+        shellMessage(shell,strings.checking||'…');
+        try{
+            const response=await fetch(url,{method:body?'POST':'GET',body,credentials:'same-origin',cache:'no-store'});
+            const destination=local(response.url);
+            if(!response.ok||!destination)throw Error();
+            const doc=new DOMParser().parseFromString(await response.text(),'text/html');
+            const parsed=doc.querySelector('[data-ach-auth-shell]');
+            if(!parsed){
+                // A successful native login/reset may legitimately leave
+                // the shell. Navigate by GET only, never replay the POST.
+                window.location.assign(destination.href);return;
+            }
+            // If a native extension emitted scripts/extra interactive form
+            // controls, preserve its actual document rather than injecting
+            // executable code or silently bypassing its validation.
+            if(parsed.querySelector('script,iframe,object,embed')||[...parsed.querySelectorAll('form[data-ach-native-method]')].some(form=>!simpleNativeForm(form))){
+                if(!body){window.location.assign(destination.href);return;}
+                throw Error();
+            }
+            shell=installShell(shell,parsed,draft);
+            if(!embedded&&push)history.pushState({achAuth:true},'',destination.href);
+        }catch(_){
+            // An uncertain native POST is not retried. Offer a deliberate
+            // safe GET to reconcile session or return to the form.
+            shellMessage(shell,body?(strings.native_uncertain||strings.network):(strings.network||'…'));
+            const notice=shell.querySelector('[data-ach-navigation-status]');
+            if(notice){
+                const link=document.createElement('a');link.href=body?(shell.dataset.achReturn||url.href):url.href;
+                if(local(link.href)){link.textContent=strings.retry_status||'↻';notice.append(' ',link);}
+            }
+        }finally{
+            navigations.delete(original);shell.removeAttribute('aria-busy');
+        }
+    }
+    function simpleNativeForm(form){
+        if(form.dataset.achAsync==='0'||form.querySelector('iframe,script,object,embed,[contenteditable]'))return false;
+        const supported=new Set(['username','password','rememberme','email','woocommerce-login-nonce','woocommerce-register-nonce',
+            '_wp_http_referer','redirect','login','register','log','pwd','user_login','user_email','_ach_nonce','ach_accounts_native_form','wp-submit']);
+        return [...form.elements].every(field=>!field.name||supported.has(field.name));
+    }
     function boot() {
         document.querySelectorAll('[data-ach-accounts]').forEach(initialize);
         document.querySelectorAll('.ach-accounts-popup').forEach((wrapper) => {
             const dialog = wrapper.querySelector('dialog');
             const open = wrapper.querySelector('[data-ach-popup-open]');
             const close = wrapper.querySelector('[data-ach-popup-close]');
+            let previous=null;
             open.addEventListener('click', () => {
+                previous=document.activeElement;
                 if (typeof dialog.showModal === 'function') dialog.showModal();
                 else dialog.setAttribute('open', '');
             });
             close.addEventListener('click', () => {
                 if (typeof dialog.close === 'function') dialog.close();
-                else dialog.removeAttribute('open');
+                else {dialog.removeAttribute('open');previous?.focus();}
             });
+            dialog.addEventListener('close',()=>previous?.focus());
         });
+        document.addEventListener('click',event=>{
+            const visibility=event.target.closest('[data-ach-password-visibility]');
+            if(visibility){
+                const input=document.getElementById(visibility.dataset.achPasswordVisibility);
+                if(input){const show=input.type==='password';input.type=show?'text':'password';visibility.setAttribute('aria-pressed',String(show));}
+                return;
+            }
+            const link=event.target.closest('a[data-ach-method],a[data-ach-reset],a[data-ach-native-link]');
+            if(!link||event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.altKey||event.shiftKey||
+                link.target==='_blank'||!local(link.href))return;
+            const shell=shellFor(link);
+            if(!shell)return;
+            event.preventDefault();navigateShell(shell,link.href);
+        });
+        document.addEventListener('submit',event=>{
+            const form=event.target;
+            if(event.defaultPrevented||!form.matches('form[data-ach-native-method]')||!simpleNativeForm(form))return;
+            const shell=shellFor(form);
+            if(!shell||!local(form.action))return;
+            event.preventDefault();
+            if(navigations.has(shell))return;
+            const body=new FormData(form);
+            if(event.submitter?.name)body.append(event.submitter.name,event.submitter.value);
+            // Do not retain passwords in a draft, history, or cached HTML.
+            for(const field of form.querySelectorAll('input[autocomplete="current-password"],input[autocomplete="new-password"]'))field.value='';
+            navigateShell(shell,form.action,{body});
+        });
+        const standalone=document.querySelector('[data-ach-auth-shell]');
+        if(standalone){
+            history.replaceState({achAuth:true},'',location.href);
+            window.addEventListener('popstate',event=>{
+                const shell=document.querySelector('[data-ach-auth-shell]');
+                if(shell&&event.state?.achAuth)navigateShell(shell,location.href,{push:false});
+            });
+        }
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();

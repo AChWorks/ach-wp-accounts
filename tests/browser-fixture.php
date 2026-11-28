@@ -22,6 +22,16 @@ if (in_array($mode,['classic','blocks'],true)) {
     update_option('woocommerce_checkout_page_id',(int)get_option('fixture_'.$mode));
     exit;
 }
+if ($mode==='experience-policy') {
+    $enabled=($argv[2]??'')==='on';
+    $settings=\ACh\WPAccounts\Settings::current();
+    $settings['allow_password_login']=$enabled;
+    $settings['allow_email_registration']=$enabled;
+    $settings['allow_mobile_password_reset']=$enabled;
+    $settings['registration_fields']=['first_name'=>$enabled?'required':'off','last_name'=>$enabled?'optional':'off'];
+    update_option(\ACh\WPAccounts\Settings::OPTION,$settings,false);
+    exit;
+}
 if ($mode==='default-checkout-policy') {
     $settings=\ACh\WPAccounts\Settings::current();
     $settings['checkout_reverify']=false;
@@ -126,6 +136,10 @@ if ($mode==='state') {
         'token'=>$o->get_meta('_fixture_token'),'save'=>(bool)$o->get_meta('_fixture_save'),'calls'=>(int)$o->get_meta('_fixture_payment_calls'),
     ],$orders));
     exit;
+}
+if (($theme=getenv('ACH_TEST_THEME'))!==false && $theme!=='') {
+    if (!wp_get_theme($theme)->exists()) throw new RuntimeException('Fixture theme not installed');
+    switch_theme($theme);
 }
 foreach (['ach-wp-accounts/ach-wp-accounts.php','woocommerce/woocommerce.php'] as $plugin) {
     $result=activate_plugin($plugin);

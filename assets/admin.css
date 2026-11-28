@@ -73,3 +73,19 @@
     .ach-accounts-admin .ach-admin-metadata > div { grid-template-columns: minmax(0,1fr); gap: 2px; }
     .ach-accounts-admin .ach-admin-metadata dd { text-align: start; }
 }
+.ach-accounts-admin .ach-admin-preview {
+    max-inline-size: 28rem; margin-block: 16px; padding: 20px;
+    border: 1px solid #dcdcde; border-radius: 12px;
+}
+.ach-accounts-admin .ach-admin-preview input {
+    box-sizing: border-box; display: block; inline-size: 100%;
+    margin-block: 6px 12px; min-block-size: 40px;
+}
+.ach-accounts-admin [data-ach-preview-primary] {
+    display:block; inline-size:100%; padding:12px; border:0;
+    background:#2271b1; color:#fff; border-radius:6px; font:inherit;
+}
+.ach-accounts-admin .ach-admin-dirty-dialog {
+    max-inline-size:calc(100% - 2rem); border:1px solid #dcdcde; padding:20px; border-radius:8px;
+}
+.ach-accounts-admin .ach-admin-dirty-dialog::backdrop { background:#0006; }

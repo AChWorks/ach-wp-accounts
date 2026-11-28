@@ -29,6 +29,14 @@ final class Settings
             'allow_registration' => false,
             'allow_email_registration' => true,
             'allow_password_login' => true,
+            'allow_email_login' => true,
+            'allow_first_link' => true,
+            'allow_email_password_reset' => true,
+            'allow_mobile_password_reset' => false,
+            'allow_recovery_email_enrollment' => true,
+            'allow_recovery_password_enrollment' => true,
+            'registration_fields' => ['first_name'=>'off','last_name'=>'off'],
+            'appearance' => ['logo_mode'=>'inherit','logo_id'=>0,'font_id'=>0,'accent'=>'','background'=>'','radius'=>null],
             'checkout_required' => false,
             'checkout_reverify' => false,
             'selected_provider' => '',
@@ -40,6 +48,67 @@ final class Settings
             ],
             'diagnostics_retention_hours' => 24,
         ];
+    }
+
+    public static function booleanKeys(): array
+    {
+        return array_keys(array_filter(self::defaults(), 'is_bool'));
+    }
+
+    public static function fields(): array
+    {
+        $stored = self::current()['registration_fields'];
+        return self::fieldModes(is_array($stored) ? $stored : [], false);
+    }
+
+    private static function fieldModes(array $values, bool $strict = true): array
+    {
+        $defaults = self::defaults()['registration_fields'];
+        if ($strict) { self::keys($values, array_keys($defaults), 'registration_fields'); }
+        foreach ($defaults as $key=>$mode) {
+            if (array_key_exists($key,$values) && in_array($values[$key],['off','optional','required'],true)) {
+                $defaults[$key] = $values[$key];
+            } elseif ($strict && array_key_exists($key,$values)) {
+                throw new SettingsError('registration_fields.'.$key);
+            }
+        }
+        return $defaults;
+    }
+
+    public static function appearance(): array
+    {
+        $stored = self::current()['appearance'];
+        return self::styleValues(is_array($stored) ? $stored : [], false);
+    }
+
+    private static function styleValues(array $values, bool $strict = true): array
+    {
+        $defaults = self::defaults()['appearance'];
+        if ($strict) { self::keys($values,array_keys($defaults),'appearance'); }
+        foreach ($defaults as $key=>$fallback) {
+            if (!array_key_exists($key,$values)) { continue; }
+            $v = $values[$key];
+            $valid = match($key) {
+                'logo_mode' => in_array($v,['inherit','name','custom'],true),
+                'logo_id','font_id' => is_int($v) && $v >= 0,
+                'accent','background' => is_string($v) && ($v === '' || (bool)preg_match('/\A#[0-9a-fA-F]{6}\z/D',$v)),
+                'radius' => $v === null || (is_int($v) && $v >= 0 && $v <= 64),
+            };
+            if ($valid && $key === 'logo_id' && $v !== 0) { $valid = wp_attachment_is_image($v); }
+            if ($valid && $key === 'font_id' && $v !== 0) {
+                $url = wp_get_attachment_url($v);
+                $valid = get_post_type($v)==='attachment' && is_string($url) &&
+                    Frontend::localUrl($url,'') !== '' &&
+                    in_array(get_post_mime_type($v),['font/woff','font/woff2','application/font-woff','application/font-woff2'],true);
+            }
+            if ($valid) { $defaults[$key] = $v; }
+            elseif ($strict) { throw new SettingsError('appearance.'.$key); }
+        }
+        if ($defaults['logo_mode']==='custom' && !$defaults['logo_id']) {
+            if ($strict) { throw new SettingsError('appearance.logo_id'); }
+            $defaults['logo_mode']='inherit';
+        }
+        return $defaults;
     }
 
     public static function install(): void
@@ -127,7 +196,7 @@ final class Settings
                 if (!is_array($purposes)) {
                     throw new SettingsError('providers.' . $id . '.purposes');
                 }
-                self::keys($purposes, ['login','link','step_up'], 'providers.' . $id . '.purposes');
+                self::keys($purposes, ['login','link','step_up','password_reset'], 'providers.' . $id . '.purposes');
                 foreach ($purposes as $purpose => $route) {
                     $purposes[$purpose] = self::route($id, $route, 'providers.' . $id . '.purposes.' . $purpose);
                 }
@@ -145,12 +214,9 @@ final class Settings
         }
         return [
             'revision' => $s['revision'],
-            'auth_enabled' => $s['auth_enabled'] === true,
-            'allow_registration' => $s['allow_registration'] === true,
-            'allow_email_registration' => $s['allow_email_registration'] === true,
-            'allow_password_login' => $s['allow_password_login'] === true,
-            'checkout_required' => $s['checkout_required'] === true,
-            'checkout_reverify' => $s['checkout_reverify'] === true,
+            ...array_map(static fn($v)=>$v===true,array_intersect_key($s,array_flip(self::booleanKeys()))),
+            'registration_fields' => self::fieldModes(is_array($s['registration_fields'])?$s['registration_fields']:[],false),
+            'appearance' => self::styleValues(is_array($s['appearance'])?$s['appearance']:[],false),
             'selected_provider' => $s['selected_provider'],
             'providers' => (object)$providers,
             'verification' => $s['verification'],
@@ -261,7 +327,7 @@ final class Settings
         if (!is_array($purposes)) {
             throw new SettingsError($field . '.purposes');
         }
-        self::keys($purposes, ['login','link','step_up'], $field . '.purposes');
+        self::keys($purposes, ['login','link','step_up','password_reset'], $field . '.purposes');
         foreach ($purposes as $purpose => $route) {
             $purposes[$purpose] = self::route($id, $route, $field . '.purposes.' . $purpose);
         }
@@ -285,8 +351,7 @@ final class Settings
             throw new SettingsError('schema','schema_unsupported');
         }
         global $wpdb;
-        self::keys($patch, ['auth_enabled','allow_registration','checkout_required','checkout_reverify','allow_email_registration','allow_password_login','selected_provider',
-            'providers','verification','diagnostics_retention_hours'], '');
+        self::keys($patch, [...self::booleanKeys(),'selected_provider','providers','verification','diagnostics_retention_hours','registration_fields','appearance'], '');
         // Read the exact stored option row rather than a stale object-cache
         // value. WordPress update_option has no expected-value precondition.
         $previous = $wpdb->suppress_errors(true);
@@ -302,12 +367,21 @@ final class Settings
                 throw new SettingsError('revision', 'settings_conflict');
             }
             $next = array_replace(self::defaults(), array_intersect_key($stored, self::defaults()));
-            foreach (['auth_enabled','allow_registration','checkout_required','checkout_reverify','allow_email_registration','allow_password_login'] as $key) {
+            foreach (self::booleanKeys() as $key) {
                 if (array_key_exists($key, $patch)) {
                     if (!is_bool($patch[$key])) {
                         throw new SettingsError($key);
                     }
                     $next[$key] = $patch[$key];
+                }
+            }
+            foreach (['registration_fields','appearance'] as $key) {
+                if (array_key_exists($key,$patch)) {
+                    if (!is_array($patch[$key])) { throw new SettingsError($key); }
+                    $existing = is_array($next[$key]) ? $next[$key] : [];
+                    $next[$key] = $key==='registration_fields'
+                        ? self::fieldModes(array_replace(self::fieldModes($existing,false),$patch[$key]))
+                        : self::styleValues(array_replace(self::styleValues($existing,false),$patch[$key]));
                 }
             }
             if (array_key_exists('selected_provider', $patch)) {

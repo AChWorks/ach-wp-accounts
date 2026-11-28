@@ -235,14 +235,25 @@ final class AdminView
     {
         Settings::requireOperator();
         self::$result = $result;
-        echo '<div class="wrap ach-accounts-admin"><h1>ACh WP Accounts</h1>';
+        $navigation = [
+            'loading'=>__('Loading settings…','ach-wp-accounts'),
+            'failed'=>__('Settings could not be loaded. Try again.','ach-wp-accounts'),
+            'save_failed'=>__('The save result is uncertain. Reload saved settings before trying again.','ach-wp-accounts'),
+            'dirty'=>__('You have unsaved changes.','ach-wp-accounts'),
+            'save'=>__('Save changes','ach-wp-accounts'),
+            'discard'=>__('Discard changes','ach-wp-accounts'),
+            'stay'=>__('Stay on this tab','ach-wp-accounts'),
+            'multiple'=>__('Save each changed form before leaving this tab.','ach-wp-accounts'),
+            'retry'=>__('Try again','ach-wp-accounts'),
+        ];
+        echo '<div class="wrap ach-accounts-admin" data-ach-navigation="'.esc_attr(wp_json_encode($navigation)).'"><h1 tabindex="-1">ACh WP Accounts</h1>';
         self::readiness($settings);
         echo '<nav class="nav-tab-wrapper ach-admin-tabs" aria-label="' . esc_attr__('Account settings','ach-wp-accounts') . '">';
         foreach (Admin::tabs() as $key=>$label) {
             printf('<a class="nav-tab%s" href="%s"%s>%s</a>',$key===$tab ? ' nav-tab-active' : '',
                 esc_url(Admin::url($key)),$key===$tab ? ' aria-current="page"' : '',esc_html($label));
         }
-        echo '</nav>';
+        echo '</nav><p data-ach-admin-status role="status" aria-live="polite" hidden></p>';
         if (isset($result['code'])) {
             self::notice(self::error($result['code']));
             if (($result['field'] ?? '') !== '') {
@@ -255,10 +266,13 @@ final class AdminView
                 echo '<p><a class="button" href="' . esc_url(Admin::url($tab,$tab==='sms' ? ['provider'=>Admin::editor($settings)] : [])) . '">' .
                     esc_html__('Reload saved settings','ach-wp-accounts') . '</a></p>';
             }
-        } elseif (Admin::queryParam('saved') === $settings['revision'] && $settings['revision'] !== 'initial') {
+        } elseif (isset($result['revision']) || (Admin::queryParam('saved') === $settings['revision'] && $settings['revision'] !== 'initial')) {
             self::notice(__('Settings saved.','ach-wp-accounts'),true);
         }
         match ($tab) {
+            'fields'=>self::fields($settings),
+            'account'=>self::account($settings),
+            'appearance'=>self::appearance($settings),
             'sms'=>self::sms($settings),
             'diagnostics'=>self::diagnostics($settings),
             default=>self::general($settings),
@@ -277,12 +291,17 @@ final class AdminView
             'allow_registration'=>[__('Mobile registration','ach-wp-accounts'),__('Allow mobile-based registration only where native site registration is enabled.','ach-wp-accounts')],
             'allow_email_registration'=>[__('Email registration','ach-wp-accounts'),__('Allow native public email registration where the site permits it.','ach-wp-accounts')],
             'allow_password_login'=>[__('Customer password sign-in','ach-wp-accounts'),__('Keep password sign-in available to ordinary customers. Administrators and other privileged accounts retain native access. Check access for customers without a mobile number before disabling.','ach-wp-accounts')],
-            'checkout_required'=>[__('Require verified mobile at checkout','ach-wp-accounts'),__('Customers must sign in and have a verified mobile before payment.','ach-wp-accounts')],
-            'checkout_reverify'=>[__('Require mobile verification in each checkout session','ach-wp-accounts'),__('When checkout verification is required, enable this to require mobile proof in the current login session. When off, a signed-in customer with a previously verified mobile can pay without another SMS.','ach-wp-accounts')],
+            'allow_email_login'=>[__('Allow email as a sign-in identifier','ach-wp-accounts'),__('When off, an actual username can still be used with a password. This does not disable email password recovery.','ach-wp-accounts')],
+            'allow_first_link'=>[__('Link a mobile number to an existing account','ach-wp-accounts'),__('Allow guests to prove existing credentials and a new mobile without creating a duplicate account.','ach-wp-accounts')],
+            'allow_email_password_reset'=>[__('Password reset by email','ach-wp-accounts'),__('Use the native email reset link. Independent of email sign-in.','ach-wp-accounts')],
+            'allow_mobile_password_reset'=>[__('Password reset by verified mobile','ach-wp-accounts'),__('Only ordinary accounts with a previously verified number can reset their password using a new recovery code.','ach-wp-accounts')],
         ] as $key=>[$label,$description]) {
             echo '<div class="ach-admin-setting">';
             self::checkbox($key,$label,isset($draft[$key]) ? $draft[$key]==='1' : $s[$key],$description,true);
             echo '</div>';
+        }
+        if (!$s['allow_password_login']) {
+            self::notice(__('Existing accounts without a mobile number may lose access. Review recovery before disabling sign-in methods.','ach-wp-accounts'));
         }
         self::endForm(__('Save changes','ach-wp-accounts'));
         echo '</section><section class="ach-admin-panel">';
@@ -299,7 +318,76 @@ final class AdminView
         foreach ($rows as $label=>$value) {
             printf('<div><dt>%s</dt><dd>%s</dd></div>',esc_html($label),esc_html($value));
         }
-        echo '</dl></section>';
+        echo '</dl>';
+        foreach (['wp'=>__('WordPress','ach-wp-accounts'),'account'=>__('My account','ach-wp-accounts'),'checkout'=>__('Checkout','ach-wp-accounts')] as $context=>$label) {
+            if ($context!=='wp' && !function_exists('WC')) { continue; }
+            self::paragraph($label.' — '.__('Email registration','ach-wp-accounts').': '.self::state(Capabilities::emailSignup($context)));
+        }
+        if ($s['allow_email_registration'] && !$s['allow_email_password_reset']) {
+            self::paragraph(__('Email registration requiring a native password setup link is unavailable while email password reset is disabled.','ach-wp-accounts'));
+        }
+        echo '</section>';
+    }
+
+    private static function account(array $s): void
+    {
+        echo '<section class="ach-admin-panel">';
+        self::title(__('Account and checkout','ach-wp-accounts'));
+        $draft=self::draft('account');
+        self::startForm('account','account',$s);
+        foreach ([
+            'allow_recovery_email_enrollment'=>[__('Allow optional recovery email','ach-wp-accounts'),__('A confirmed email remains on the account when enrollment is disabled.','ach-wp-accounts')],
+            'allow_recovery_password_enrollment'=>[__('Allow optional recovery password','ach-wp-accounts'),__('Existing native credentials remain unchanged.','ach-wp-accounts')],
+            'checkout_required'=>[__('Require verified mobile at checkout','ach-wp-accounts'),__('Customers must sign in and have a verified mobile before payment.','ach-wp-accounts')],
+            'checkout_reverify'=>[__('Require mobile verification in each checkout session','ach-wp-accounts'),__('When checkout verification is required, enable this to require mobile proof in the current login session. When off, a signed-in customer with a previously verified mobile can pay without another SMS.','ach-wp-accounts')],
+        ] as $key=>[$label,$help]) {
+            echo '<div class="ach-admin-setting">';
+            self::checkbox($key,$label,isset($draft[$key])?$draft[$key]==='1':$s[$key],$help,true);
+            echo '</div>';
+        }
+        self::endForm(__('Save changes','ach-wp-accounts'));
+        echo '</section>';
+    }
+
+    private static function fields(array $s): void
+    {
+        echo '<section class="ach-admin-panel">';
+        self::title(__('Mobile registration fields','ach-wp-accounts'));
+        self::paragraph(__('Only new accounts see these fields after mobile verification. Native required fields and checkout validation remain unchanged.','ach-wp-accounts'));
+        self::startForm('fields','fields',$s);
+        $draft=self::draft('fields');
+        $modes=['off'=>__('Disabled','ach-wp-accounts'),'optional'=>__('Optional','ach-wp-accounts'),'required'=>__('Required','ach-wp-accounts')];
+        foreach (['first_name'=>__('First name','ach-wp-accounts'),'last_name'=>__('Last name','ach-wp-accounts')] as $key=>$label) {
+            self::select($key,$label,$modes,$draft[$key]??$s['registration_fields'][$key]);
+        }
+        echo '<div class="ach-admin-preview" data-ach-field-preview aria-live="polite"><strong>'.esc_html__('Registration preview','ach-wp-accounts').'</strong>';
+        foreach (['first_name'=>__('First name','ach-wp-accounts'),'last_name'=>__('Last name','ach-wp-accounts')] as $key=>$label) {
+            printf('<div data-ach-preview-field="%s"><label>%s <span data-ach-preview-required></span><input disabled aria-label="%s"></label></div>',esc_attr($key),esc_html($label),esc_attr($label));
+        }
+        echo '</div>';
+        self::endForm(__('Save changes','ach-wp-accounts'));
+        echo '</section>';
+    }
+
+    private static function appearance(array $s): void
+    {
+        echo '<section class="ach-admin-panel">';
+        self::title(__('Appearance','ach-wp-accounts'));
+        self::paragraph(__('Inherit the site appearance by default. Overrides are limited to account components.','ach-wp-accounts'));
+        self::startForm('appearance','appearance',$s);
+        $a=array_replace($s['appearance'],self::draft('appearance'));
+        self::select('logo_mode',__('Logo','ach-wp-accounts'),['inherit'=>__('Site logo','ach-wp-accounts'),'name'=>__('Site name','ach-wp-accounts'),'custom'=>__('Custom image','ach-wp-accounts')],(string)$a['logo_mode']);
+        self::input('logo_id',__('Logo media attachment ID','ach-wp-accounts'),$a['logo_id'],'number',__('Select an image from the Media Library by its attachment ID.','ach-wp-accounts'),true);
+        self::input('font_id',__('Local font attachment ID','ach-wp-accounts'),$a['font_id'],'number',__('Zero inherits the site font. A local WOFF or WOFF2 attachment is supported.','ach-wp-accounts'),true);
+        echo '<p><a href="'.esc_url(admin_url('upload.php')).'" target="_blank" rel="noopener">'.esc_html__('Open Media Library','ach-wp-accounts').'</a></p>';
+        self::input('accent',__('Accent color','ach-wp-accounts'),$a['accent'],'text',__('Empty inherits the site color; otherwise use a six-digit hex color.','ach-wp-accounts'),true);
+        self::input('background',__('Standalone background color','ach-wp-accounts'),$a['background'],'text',__('Empty inherits the site background.','ach-wp-accounts'),true);
+        self::input('radius',__('Corner radius (px)','ach-wp-accounts'),$a['radius']??'','number',__('Empty inherits the default; 0–64 pixels.','ach-wp-accounts'),true);
+        echo '<label>'.esc_html__('Preview width','ach-wp-accounts').' <select data-ach-preview-width><option value="390">'.esc_html__('Mobile','ach-wp-accounts').'</option><option value="680">'.esc_html__('Desktop','ach-wp-accounts').'</option></select></label>';
+        echo '<div class="ach-admin-preview" data-ach-style-preview><p><strong>'.esc_html__('Sign in or register','ach-wp-accounts').'</strong></p><label>'.esc_html__('Mobile number','ach-wp-accounts').'<input disabled dir="ltr" value="0912 ••• 1234"></label><p><button type="button" disabled data-ach-preview-primary>'.esc_html__('Get verification code','ach-wp-accounts').'</button></p></div>';
+        self::checkbox('reset_appearance',__('Reset to inherited appearance','ach-wp-accounts'),false);
+        self::endForm(__('Save changes','ach-wp-accounts'));
+        echo '</section>';
     }
 
     /** Convert the saved provider route to a presentation-only form model. */

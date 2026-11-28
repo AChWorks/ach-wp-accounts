@@ -43,7 +43,7 @@ final class Operations
         if (!$confirmed) {
             throw new SettingsError('confirm_send', 'confirmation_required');
         }
-        if (!preg_match('/\A[0-9a-f]{32}\z/D', $requestId) || !in_array($purpose, ['login','link','step_up'], true)) {
+        if (!preg_match('/\A[0-9a-f]{32}\z/D', $requestId) || !in_array($purpose, ['login','link','step_up','password_reset'], true)) {
             throw new SettingsError('request_id');
         }
         try {

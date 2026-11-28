@@ -126,6 +126,7 @@ final class BrowserApi
             'authenticated' => $id > 0,
             'user_id' => $context === 'checkout' ? $id : 0,
             'qualified' => $context === 'checkout' ? CheckoutGate::qualified($mobile) : SessionProof::qualifies(),
+            'account_mobile' => $context==='checkout' && $id>0 && SessionProof::currentToken($id)!=='' && $identity ? $identity->mobile : '',
             'phone_matches' => $identity === null || $mobile === null || $mobile === '' || CheckoutGate::matchesMobile($mobile),
             'recent_proof' => SessionProof::qualifies(SessionProof::LINK_FRESHNESS),
             'can_link' => $id > 0 && AccountPolicy::canLinkWithoutPassword($id, $identity),
@@ -134,6 +135,8 @@ final class BrowserApi
             'recovery_email' => $managed ? (string) get_userdata($id)->user_email : '',
             'native_username' => $managed ? (string) get_userdata($id)->user_login : '',
             'has_mobile' => $identity !== null,
+            'mobile_verified' => $identity !== null && (int)$identity->verified_at>0,
+            'capabilities' => Capabilities::forContext($context),
             'masked_mobile' => $identity ? '+98 ' . substr($identity->mobile, 3, 3) . ' *** ' . substr($identity->mobile, -4) : '',
         ];
     }
@@ -151,6 +154,9 @@ final class BrowserApi
             'registration_disabled', 'registration_denied' => [403, __('Account registration is not available here. Please sign in to your existing account or contact support.', 'ach-wp-accounts')],
             'registration_pending' => [409, __('We could not finish creating your account. Please contact support before trying again.', 'ach-wp-accounts')],
             'reauthentication_required' => [403, __('Please confirm your current account credentials.', 'ach-wp-accounts')],
+            'method_disabled' => [403, __('This account method is unavailable.', 'ach-wp-accounts')],
+            'reset_unavailable' => [403, __('Password reset with this mobile number is unavailable. Use another permitted method or contact support.', 'ach-wp-accounts')],
+            'invalid_profile_fields' => [400, __('Complete the required name fields.', 'ach-wp-accounts')],
             'invalid_email' => [400, __('Please enter a valid email address.', 'ach-wp-accounts')],
             'email_unavailable' => [409, __('This email address is not available for this account.', 'ach-wp-accounts')],
             'email_send_failed' => [503, __('The confirmation message could not be confirmed as sent. Please try again later.', 'ach-wp-accounts')],
@@ -203,6 +209,15 @@ final class BrowserApi
                     $result = $flow->complete(
                         self::browser(false), self::input('ticket', 2048), self::input('code', 32)
                     );
+                    break;
+                case 'continue_registration':
+                    $result = $flow->continueRegistration(self::browser(false),self::input('ticket',2048),
+                        self::input('proof',64),['first_name'=>self::input('first_name',400,false),
+                            'last_name'=>self::input('last_name',400,false)]);
+                    break;
+                case 'reset_password':
+                    $result = $flow->resetPassword(self::browser(false),self::input('ticket',2048),
+                        self::input('proof',64),self::input('new_password',4096),self::input('confirmation',4096));
                     break;
                 case 'checkout_context':
                     if (self::input('context',32) !== 'checkout' || !CheckoutGate::enabled() || !function_exists('WC') ||

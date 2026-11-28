@@ -2,7 +2,7 @@
 /**
  * Plugin Name: ACh WP Accounts
  * Description: Verified mobile identity and native WordPress account integration.
- * Version: 0.2.0
+ * Version: 0.3.0
  * Update URI: https://github.com/AChWorks/ach-wp-accounts
  * Requires at least: 6.3
  * Requires PHP: 8.1
@@ -42,9 +42,11 @@ require_once __DIR__ . '/includes/CLI.php';
 require_once __DIR__ . '/includes/Recovery.php';
 require_once __DIR__ . '/includes/AccountFlow.php';
 require_once __DIR__ . '/includes/NativeAccess.php';
+require_once __DIR__ . '/includes/Capabilities.php';
 require_once __DIR__ . '/includes/BrowserApi.php';
 require_once __DIR__ . '/includes/CheckoutGate.php';
 require_once __DIR__ . '/includes/CheckoutUi.php';
+require_once __DIR__ . '/includes/Appearance.php';
 require_once __DIR__ . '/includes/Frontend.php';
 require_once __DIR__ . '/includes/AuthPage.php';
 require_once __DIR__ . '/includes/CustomerDirectory.php';
