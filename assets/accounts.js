@@ -1121,6 +1121,8 @@
             const open = wrapper.querySelector('[data-ach-popup-open]');
             const close = wrapper.querySelector('[data-ach-popup-close]');
             const shell=wrapper.querySelector('[data-ach-embedded]');
+            const modal=typeof dialog.showModal==='function';
+            if(!modal)dialog.setAttribute('data-ach-popup-fallback','');
             let previous=null;
             let presented=false;
             const isOpen=()=>dialog.hasAttribute('open');
@@ -1137,7 +1139,7 @@
                 // Closing a presentation is not a rollback of a dispatched
                 // account operation. Keep the popup visible while it settles.
                 if(!isOpen()||shellBusy(shell))return;
-                if(typeof dialog.close==='function')dialog.close();
+                if(modal&&typeof dialog.close==='function')dialog.close();
                 else dialog.removeAttribute('open');
                 // Clear secrets immediately. Keep safe drafts and the same
                 // live challenge/continuation, subject to server expiry.
@@ -1147,16 +1149,17 @@
                 if(isOpen())return;
                 previous=document.activeElement;
                 presented=true;
-                if(typeof dialog.showModal==='function')dialog.showModal();
+                if(modal)dialog.showModal();
                 else dialog.setAttribute('open','');
                 syncPopupDismissal(shell);
+                if(!modal)close.focus();
             });
             close.addEventListener('click',dismiss);
             dialog.addEventListener('cancel',event=>{
                 event.preventDefault();dismiss();
             });
             dialog.addEventListener('keydown',event=>{
-                if(event.key==='Escape'&&typeof dialog.showModal!=='function'){
+                if(event.key==='Escape'&&!modal){
                     event.preventDefault();dismiss();
                 }
             });

@@ -282,6 +282,10 @@ async function changeWithPassword(root) {
             const dialog=page.locator('dialog');
             const root=q(dialog,'accounts');
             await open.click();
+            assert.equal(await dialog.getAttribute('data-ach-popup-fallback'),'');
+            assert.equal(await dialog.evaluate(e=>getComputedStyle(e).position),'relative');
+            assert.ok(await q(dialog,'popup-close').evaluate(e=>e===document.activeElement),'Fallback did not receive focus');
+            await fits(page);
             await q(root,'recover').click();
             await q(root,'login').fill(fixture.login);
             for(const escape of [false,true]){
