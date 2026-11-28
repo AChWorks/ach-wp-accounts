@@ -2,7 +2,7 @@
 /**
  * Plugin Name: ACh WP Accounts
  * Description: Verified mobile identity and native WordPress account integration.
- * Version: 0.1.0
+ * Version: 0.2.0
  * Update URI: https://github.com/AChWorks/ach-wp-accounts
  * Requires at least: 6.3
  * Requires PHP: 8.1
@@ -41,9 +41,13 @@ require_once __DIR__ . '/includes/Privacy.php';
 require_once __DIR__ . '/includes/CLI.php';
 require_once __DIR__ . '/includes/Recovery.php';
 require_once __DIR__ . '/includes/AccountFlow.php';
+require_once __DIR__ . '/includes/NativeAccess.php';
 require_once __DIR__ . '/includes/BrowserApi.php';
 require_once __DIR__ . '/includes/CheckoutGate.php';
+require_once __DIR__ . '/includes/CheckoutUi.php';
 require_once __DIR__ . '/includes/Frontend.php';
+require_once __DIR__ . '/includes/AuthPage.php';
+require_once __DIR__ . '/includes/CustomerDirectory.php';
 require_once __DIR__ . '/includes/Abilities.php';
 require_once __DIR__ . '/includes/Updater.php';
 require_once __DIR__ . '/includes/Admin.php';
@@ -58,7 +62,11 @@ add_action('clear_auth_cookie', [\ACh\WPAccounts\SessionProof::class, 'logout'])
 \ACh\WPAccounts\Admin::hooks();
 \ACh\WPAccounts\BrowserApi::hooks();
 \ACh\WPAccounts\CheckoutGate::hooks();
+\ACh\WPAccounts\CheckoutUi::hooks();
 \ACh\WPAccounts\Frontend::hooks();
+\ACh\WPAccounts\NativeAccess::hooks();
+\ACh\WPAccounts\AuthPage::hooks();
+\ACh\WPAccounts\CustomerDirectory::hooks();
 
 \ACh\WPAccounts\Lifecycle::hooks(__FILE__);
 add_action('ach_wp_accounts_cleanup', [\ACh\WPAccounts\Schema::class, 'cleanup']);

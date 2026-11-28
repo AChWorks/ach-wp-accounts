@@ -45,7 +45,9 @@ final class AccountFlow
         string $mobile,
         string $purpose,
         string $context,
-        #[\SensitiveParameter] string $password = ''
+        #[\SensitiveParameter] string $password = '',
+        string $login = '',
+        string $contactEmail = ''
     ): string {
         $mobile = Mobile::normalize($mobile);
         if (!in_array($context, ['wp','account','checkout'], true)) {
@@ -55,7 +57,14 @@ final class AccountFlow
         $actor = self::actor();
         $own = Identity::byUser($userId);
         $target = Identity::byMobile($mobile);
-        if ($purpose === 'login') {
+        $recovery = null;
+        if ($purpose === 'recover') {
+            $recovery = AccountPolicy::recoveryUser($login, $password);
+            // First linking only. Do not authorize ownership by billing data
+            // or silently replace an established identity.
+            if ($target !== null) { throw new VerificationError('identity_conflict'); }
+            $purpose = 'link';
+        } elseif ($purpose === 'login') {
             if ($userId !== 0) {
                 throw new VerificationError('invalid_context');
             }
@@ -64,7 +73,7 @@ final class AccountFlow
                 throw new VerificationError('invalid_context');
             }
         } elseif ($purpose === 'link') {
-            if ($userId < 1) {
+            if ($userId < 1 || ($context === 'checkout' && $own !== null)) {
                 throw new VerificationError('invalid_context');
             }
             if ($password !== '' || !AccountPolicy::canLinkWithoutPassword($userId, $own)) {
@@ -85,6 +94,10 @@ final class AccountFlow
             'own' => self::snapshot($own, $id, 'own'),
             'target' => self::snapshot($target, $id, 'target'),
             'expires' => time() + 600 + $this->verification->codeLifetime(),
+            'recovery_user' => $recovery?->ID ?? 0,
+            'recovery_credential' => $recovery ? self::recoveryCredential($recovery) : '',
+            // Only a contact supplied by this browser; never account proof.
+            'contact_email' => $context === 'checkout' && $purpose === 'login' ? sanitize_email($contactEmail) : '',
         ];
         self::checkSnapshots($data);
         $payload = self::encode($data);
@@ -96,8 +109,27 @@ final class AccountFlow
         return hash_hmac('sha256', "ach-wpa-binding\0$id\0$kind\0" . Identity::revision($identity), wp_salt('auth'));
     }
 
+    private static function recoveryCredential(\WP_User $user): string
+    {
+        return hash_hmac('sha256', "ach-wpa-recovery\0".$user->ID."\0".$user->user_pass, wp_salt('auth'));
+    }
+
+    private static function checkRecovery(array $data): ?\WP_User
+    {
+        $id = (int)($data['recovery_user'] ?? 0);
+        if (!$id) { return null; }
+        $user = get_userdata($id);
+        if (get_current_user_id() !== 0 || $data['purpose'] !== 'link' || !$user instanceof \WP_User ||
+            !AccountPolicy::ordinary($user) || Identity::byUser($id) ||
+            !hash_equals($data['recovery_credential'], self::recoveryCredential($user))) {
+            throw new VerificationError('identity_changed');
+        }
+        return $user;
+    }
+
     private static function checkSnapshots(array $data): void
     {
+        self::checkRecovery($data);
         $own = Identity::byUser(get_current_user_id());
         $target = Identity::byMobile($data['mobile']);
         if (!hash_equals($data['own'], self::snapshot($own, $data['id'], 'own')) ||
@@ -166,9 +198,21 @@ final class AccountFlow
                 throw new VerificationError('registration_pending');
             }
             $created = $identity === null;
+            if ($created && ($data['contact_email'] ?? '') !== '' && email_exists($data['contact_email'])) {
+                // An existing email is not sufficient authority to link an
+                // account. Offer the explicit credential + OTP recovery path.
+                throw new VerificationError('existing_account_required');
+            }
             $identity = $identity ?? Accounts::register($mobile, $data['context']);
             Accounts::login($identity);
             return ['outcome' => 'authenticated', 'created' => $created];
+        }
+
+        $recovery = self::checkRecovery($data);
+        if ($recovery) {
+            $identity = Identity::bind($recovery->ID, $mobile, 'absent');
+            Accounts::login($identity);
+            return ['outcome' => 'authenticated', 'created' => false];
         }
 
         $userId = get_current_user_id();

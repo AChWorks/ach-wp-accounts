@@ -52,6 +52,8 @@ function nativeBoundary(callable $fn, bool $blocked): void {
 assertCheckout(!BrowserApi::enabled(),'Authentication unexpectedly active by default');
 assertCheckout(!CheckoutGate::enabled() && !rejectsClassic(),'Checkout unexpectedly restricted by default');
 fixtureFlag('checkout_required',true);
+assertCheckout(!\ACh\WPAccounts\Settings::flag('checkout_reverify'),'Repeat OTP must default off');
+fixtureFlag('checkout_reverify',true);
 wp_set_current_user(0);
 assertCheckout(rejectsClassic(),'Guest classic checkout accepted');
 nativeBoundary(fn()=>do_action('woocommerce_checkout_order_processed',1,[],null),true);
@@ -83,6 +85,31 @@ wp_set_auth_cookie($id,false,true);
 assertCheckout(!SessionProof::qualifies() && rejectsClassic(),'Password-only account bypassed gate');
 $token=SessionProof::currentToken($id);
 assertCheckout($token!=='','Native WP cookie not valid');
+// Imported mappings do not assert possession, even with repeat OTP off.
+$pendingId=wp_insert_user(['user_login'=>'fixture_checkout_pending','user_pass'=>wp_generate_password(32),'role'=>'customer']);
+assertCheckout(is_int($pendingId),'Pending customer fixture failed');
+Identity::importReviewedMapping($pendingId,'09121111135',str_repeat('b',64));
+$previousCookie=$_COOKIE[LOGGED_IN_COOKIE];
+wp_set_current_user($pendingId);
+wp_set_auth_cookie($pendingId,false,true);
+fixtureFlag('checkout_reverify',false);
+assertCheckout(CheckoutGate::blocked() && rejectsClassic(),'Imported unverified mapping bypassed default checkout verification');
+$_COOKIE[LOGGED_IN_COOKIE]=$previousCookie;
+wp_set_current_user($id);
+
+fixtureFlag('checkout_reverify',false);
+assertCheckout(!SessionProof::qualifies() && !rejectsClassic() && CheckoutGate::qualified('۰۹۱۲۱۱۱۱۱۱۹'),
+    'Previously verified customer unnecessarily needs OTP');
+assertCheckout(CheckoutGate::blocked('09121111118'),'Different checkout mobile bypassed matching policy');
+assertCheckout(BrowserApi::status('checkout')['qualified'] && !BrowserApi::status('account')['qualified'] &&
+    !BrowserApi::status('checkout')['recent_proof'],'Relaxed checkout granted sensitive account authority');
+nativeBoundary(fn()=>do_action('woocommerce_checkout_order_processed',1,[],null),false);
+nativeBoundary(fn()=>do_action('woocommerce_store_api_checkout_order_processed',null),false);
+assertCheckout(CheckoutGate::storeRequest(null,[],new WP_REST_Request('POST','/wc/store/v1/checkout'))===null,
+    'Relaxed policy rejected verified native Store API session');
+fixtureFlag('checkout_reverify',true);
+assertCheckout(rejectsClassic(),'Enabling repeat OTP did not require session proof');
+
 foreach (['/wc/store/v1/checkout','/wc/store/v1/checkout/123'] as $route) {
     $response=restCheckout($route);
     assertCheckout($response->get_status()===403 && $response->get_data()['code']==='ach_wp_accounts_mobile_required','Unverified native account bypassed Store API');
@@ -141,9 +168,12 @@ Identity::bind($id,'+989121111120',$identity->revision);
 assertCheckout(!SessionProof::qualifies() && rejectsClassic(),'Identity change retained checkout access');
 $identity=Identity::byUser($id);
 SessionProof::record($id,$token,$identity);
+fixtureFlag('checkout_reverify',false);
+assertCheckout(CheckoutGate::qualified(),'Verified changed identity should use current account identity');
 WP_Session_Tokens::get_instance($id)->destroy($token);
 assertCheckout(!SessionProof::qualifies() && rejectsClassic(),'Revoked session retained checkout access');
 fixtureFlag('checkout_required',false);
+fixtureFlag('checkout_reverify',false);
 assertCheckout(!rejectsClassic(),'Disabled policy continued to reject checkout');
 
 // Validate the request boundary independently of an HTTP server. Actual
@@ -166,4 +196,4 @@ unset($_SERVER['HTTP_X_ACH_ACCOUNTS']);
 try { BrowserApi::authorizeRequest(); throw new RuntimeException('Simple form POST accepted'); }
 catch (VerificationError $error) { assertCheckout($error->getMessage()==='invalid_context','Unexpected simple form rejection'); }
 fixtureFlag('auth_enabled',false);
-echo "PASS: native REST checkout refusal, classic validation/boundary, actual order-pay gateway refusal/allow, session revocation and same-origin request policy\n";
+echo "PASS: optional repeat-OTP policy and separate sensitive-account proof, native REST checkout refusal, classic validation/boundary, actual order-pay gateway refusal/allow, session revocation and same-origin request policy\n";

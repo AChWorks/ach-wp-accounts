@@ -46,3 +46,96 @@
 .ach-accounts-recovery { margin-block-start: 1rem; border-block-start: 1px solid color-mix(in srgb, currentColor 18%, transparent); padding-block-start: .75rem; }
 .ach-accounts-recovery summary { cursor: pointer; font-weight: 600; }
 .ach-accounts-recovery form + form { margin-block-start: 1.5rem; }
+
+/* Standalone auth document; no dependence on the active theme's form styles. */
+body.ach-auth-body {
+    --ach-ink: #182330;
+    --ach-muted: #526071;
+    --ach-border: #d6dce4;
+    --ach-accent: #135e96;
+    margin: 0;
+    background: #f4f6f9;
+    color: var(--ach-ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.65;
+    min-block-size: 100vh;
+}
+.ach-auth-page, .ach-auth-page * { box-sizing: border-box; }
+.ach-auth-page {
+    display: grid;
+    align-items: center;
+    justify-items: center;
+    min-block-size: 100vh;
+    padding: clamp(.75rem, 4vw, 2rem);
+}
+.ach-auth-shell {
+    inline-size: min(100%, 27rem);
+    padding: clamp(1.1rem, 5vw, 2rem);
+    background: #fff;
+    border: 1px solid var(--ach-border);
+    border-radius: 1rem;
+    box-shadow: 0 12px 40px rgba(20, 35, 55, .07);
+}
+.ach-auth-brand { display: flex; align-items: center; gap: 1rem; margin-block-end: 1.5rem; }
+.ach-auth-brand a { color: var(--ach-ink); text-decoration: none; }
+.ach-auth-back { display: grid; place-items: center; inline-size: 2.5rem; block-size: 2.5rem; border: 1px solid var(--ach-border); border-radius: .5rem; }
+[dir="rtl"] .ach-auth-back span { transform: scaleX(-1); }
+.ach-auth-logo { flex: 1; min-inline-size: 0; font-size: 1.15rem; font-weight: 700; overflow-wrap: anywhere; }
+.ach-auth-image { max-inline-size: 100%; max-block-size: 3rem; inline-size: auto; block-size: auto; object-fit: contain; }
+.ach-auth-shell .ach-accounts { inline-size: 100%; border: 0; padding: 0; margin: 0; }
+.ach-auth-shell .ach-accounts h2 { color: var(--ach-ink); font: inherit; font-size: 1.4rem; font-weight: 700; }
+.ach-auth-shell .ach-accounts p { color: var(--ach-muted); }
+.ach-auth-shell .ach-accounts form { margin: 1rem 0 0; padding: 0; border: 0; }
+.ach-accounts input:not([type="hidden"]) {
+    border: 1px solid #aab6c4;
+    border-radius: .55rem;
+    background: #fff;
+    color: #182330;
+    padding: .65rem .85rem;
+    box-shadow: none;
+}
+.ach-accounts .ach-accounts-primary {
+    border: 1px solid transparent;
+    border-radius: .55rem;
+    padding: .65rem 1rem;
+    background: #135e96;
+    color: #fff;
+    font-weight: 650;
+    cursor: pointer;
+    text-decoration: none;
+    box-shadow: none;
+}
+.ach-accounts .ach-accounts-primary:not(:disabled):hover { background: #104d7c; color: #fff; }
+.ach-accounts .ach-accounts-primary:disabled { background: #536c81; color: #fff; opacity: 1; }
+.ach-accounts [aria-busy="true"] .ach-accounts-primary { cursor: wait; }
+.ach-auth-methods, .ach-auth-legal {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .65rem 1rem;
+    margin-block-start: 1.25rem;
+    padding-block-start: 1rem;
+    border-block-start: 1px solid var(--ach-border);
+    font-size: .9rem;
+}
+.ach-auth-shell a:not(.ach-auth-logo, .ach-auth-back) { color: var(--ach-accent); text-underline-offset: .2em; }
+.ach-auth-shell :focus-visible { outline: 2px solid var(--ach-accent); outline-offset: 3px; }
+.ach-auth-message, .ach-auth-shell [data-ach-status][data-error="1"] {
+    background: #fef2f2;
+    border-inline-start: 3px solid #b42318;
+    color: #8a211b;
+    padding: .75rem;
+    border-radius: .4rem;
+    overflow-wrap: anywhere;
+}
+.ach-accounts[hidden] { display: none !important; }
+.ach-checkout-verification {
+    inline-size: 100%;
+    margin-block: 1rem;
+    background: #fff;
+    color: #182330;
+    border: 1px solid #b8c5d3;
+    scroll-margin-block: 1rem;
+}
+.ach-checkout-verification [data-ach-form] { margin-block: .75rem; }
+.ach-checkout-verification [data-ach-status] { overflow-wrap: anywhere; }
+.ach-checkout-verification [data-error="1"] { color: #a1261a; }

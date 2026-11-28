@@ -96,7 +96,7 @@ opsError(fn()=>Operations::testSend('09121111111','login',str_repeat('a',32),tru
 $admin = get_user_by('login','fixture_admin');
 wp_set_current_user($admin->ID);
 $default = Settings::read();
-opsCheck($default['auth_enabled'] === false && $default['checkout_required'] === false, 'Unsafe default');
+opsCheck($default['auth_enabled'] === false && $default['checkout_required'] === false && $default['checkout_reverify'] === false, 'Unsafe default');
 $autoload = $wpdb->get_var($wpdb->prepare("SELECT autoload FROM $wpdb->options WHERE option_name=%s", Settings::OPTION));
 opsCheck(in_array($autoload,['no','off','auto-off'],true), 'Credentials option autoloaded');
 $calls=0;
@@ -154,6 +154,10 @@ opsCheck(Abilities::status()['provider_configured'] && Abilities::status()['comp
 opsError(fn()=>Settings::update(['checkout_required'=>false],$default['revision']),'settings_conflict');
 opsError(fn()=>saveSettings(['auth_enabled'=>false]),'authentication_required');
 opsCheck(Settings::read()['checkout_required']===true,'Failed update changed checkout');
+$repeatPolicy=saveSettings(['checkout_reverify'=>true]);
+opsCheck($repeatPolicy['checkout_reverify']===true && Settings::flag('checkout_reverify'),'Repeat OTP setting not exposed by shared settings');
+saveSettings(['checkout_reverify'=>false]);
+
 $old=Settings::current()['providers']['kavenegar']['credentials'];
 $updated=saveSettings(['providers'=>['kavenegar'=>['purposes'=>[]]]]);
 opsCheck(Settings::current()['providers']['kavenegar']['credentials']===$old && $updated['revision']!==$saved['revision'], 'Credential preservation or revision failed');
