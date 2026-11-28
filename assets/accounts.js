@@ -9,6 +9,12 @@
         }
     }
 
+    function clearPasswordInput(input, visibility) {
+        if (!input) return;
+        input.value = '';
+        input.type = 'password';
+        visibility?.setAttribute('aria-pressed', 'false');
+    }
     const controllers = new WeakMap();
     function initialize(root) {
         if (controllers.has(root)) return;
@@ -49,7 +55,10 @@
         let needsReconcile = false;
         let paymentRevision = 0;
         let pageAuthenticated = document.body.classList.contains('logged-in');
-        controllers.set(root,()=>{disposed=true;stopTimer();ticket='';proof='';clearCredentials();clearContinuations();});
+        controllers.set(root,{
+            clearCredentials,
+            dispose(){disposed=true;stopTimer();ticket='';proof='';clearCredentials();clearContinuations();}
+        });
         const capabilities=()=>model?.capabilities||initialCapabilities;
 
         function classicForm() {
@@ -531,6 +540,7 @@
             login.readOnly = value;
             for(const input of root.querySelectorAll('[data-ach-name],[data-ach-reset-new],[data-ach-reset-confirm]')) input.readOnly=value;
             updateTimer();
+            syncPopupDismissal(root);
         }
 
         function stopTimer() {
@@ -541,16 +551,13 @@
         }
 
         function clearPassword() {
-            password.value = '';
-            password.type = 'password';
-            get('toggle-password')?.setAttribute('aria-pressed', 'false');
+            clearPasswordInput(password,get('toggle-password'));
         }
         function clearCredentials() {
             clearPassword();
             code.value = '';
-            for (const name of ['new-password','confirm-password']) {
-                const field = get(name);
-                if (field) field.value = '';
+            for (const name of ['new-password','confirm-password','reset-new','reset-confirm']) {
+                clearPasswordInput(get(name));
             }
         }
         function clearContinuations() {
@@ -561,7 +568,7 @@
             }
             get('reset-fields').hidden=true;
             for(const input of [get('reset-new'),get('reset-confirm')]){
-                input.disabled=true;input.required=false;input.value='';
+                input.disabled=true;input.required=false;clearPasswordInput(input);
             }
         }
         function clearSuccess() {
@@ -900,6 +907,10 @@
             clearSuccess();submit.hidden = false;
             if(surface!=='login')form.hidden=true;
             submit.disabled=true;
+            // The embedded shell may be visible before its status arrives.
+            // Do not offer a transition which has no initialized model yet.
+            const recover=get('recover');
+            if(recover)recover.disabled=true;
             announce('');
             // Standalone guest document is emitted server-side, noncacheable,
             // and already has effective public method policy. No status
@@ -980,6 +991,26 @@
         return url.origin===location.origin&&!url.username&&!url.password?url:null;
     }
     function shellFor(node){return node.closest(shellSelector);}
+    function shellBusy(shell){
+        return Boolean(shell&&(navigations.has(shell)||shell.querySelector('[data-ach-busy="1"]')));
+    }
+    function syncPopupDismissal(node){
+        const popup=node.closest('.ach-accounts-popup');
+        if(popup)popup.querySelector('[data-ach-popup-close]').disabled=shellBusy(popup.querySelector('[data-ach-embedded]'));
+    }
+    function clearNativeCredentials(form){
+        for(const input of form.querySelectorAll('input[type="password"],input[autocomplete="current-password"],input[autocomplete="new-password"]')){
+            clearPasswordInput(input);
+        }
+        for(const toggle of form.querySelectorAll('[data-ach-password-visibility]')){
+            const input=document.getElementById(toggle.dataset.achPasswordVisibility);
+            if(input&&form.contains(input))clearPasswordInput(input,toggle);
+        }
+    }
+    function clearShellCredentials(shell){
+        for(const root of shell.querySelectorAll('[data-ach-accounts]'))controllers.get(root)?.clearCredentials();
+        for(const form of shell.querySelectorAll('form[data-ach-native-method]'))clearNativeCredentials(form);
+    }
     function shellMessage(shell,message){
         let notice=shell.querySelector('[data-ach-navigation-status]');
         if(!notice){
@@ -1014,7 +1045,7 @@
     }
     function installShell(shell,parsed,draft){
         const embedded=shell.hasAttribute('data-ach-embedded');
-        for(const root of shell.querySelectorAll('[data-ach-accounts]'))controllers.get(root)?.();
+        for(const root of shell.querySelectorAll('[data-ach-accounts]'))controllers.get(root)?.dispose();
         const replacement=document.importNode(parsed,true);
         if(embedded){
             replacement.querySelector('.ach-auth-brand')?.remove();
@@ -1039,10 +1070,10 @@
     }
     async function navigateShell(shell,raw,{body=null,push=true}={}){
         const url=local(raw);
-        if(!url||navigations.has(shell)||shell.querySelector('[data-ach-busy="1"]'))return;
+        if(!url||shellBusy(shell))return;
         const draft=preserveDraft(shell),strings=shellStrings(shell),embedded=shell.hasAttribute('data-ach-embedded');
         const original=shell;
-        navigations.add(shell);shell.setAttribute('aria-busy','true');
+        navigations.add(shell);shell.setAttribute('aria-busy','true');syncPopupDismissal(shell);
         shellMessage(shell,strings.checking||'…');
         try{
             const response=await fetch(url,{method:body?'POST':'GET',body,credentials:'same-origin',cache:'no-store'});
@@ -1074,7 +1105,7 @@
                 if(local(link.href)){link.textContent=strings.retry_status||'↻';notice.append(' ',link);}
             }
         }finally{
-            navigations.delete(original);shell.removeAttribute('aria-busy');
+            navigations.delete(original);shell.removeAttribute('aria-busy');syncPopupDismissal(shell);
         }
     }
     function simpleNativeForm(form){
@@ -1089,17 +1120,47 @@
             const dialog = wrapper.querySelector('dialog');
             const open = wrapper.querySelector('[data-ach-popup-open]');
             const close = wrapper.querySelector('[data-ach-popup-close]');
+            const shell=wrapper.querySelector('[data-ach-embedded]');
             let previous=null;
+            let presented=false;
+            const isOpen=()=>dialog.hasAttribute('open');
+            const dismissed=()=>{
+                // The close event is queued by native dialogs. Do not let an
+                // earlier dismissal clear or refocus a newly opened popup.
+                if(!presented||isOpen())return;
+                presented=false;
+                clearShellCredentials(shell);
+                previous?.focus();
+                previous=null;
+            };
+            const dismiss=()=>{
+                // Closing a presentation is not a rollback of a dispatched
+                // account operation. Keep the popup visible while it settles.
+                if(!isOpen()||shellBusy(shell))return;
+                if(typeof dialog.close==='function')dialog.close();
+                else dialog.removeAttribute('open');
+                // Clear secrets immediately. Keep safe drafts and the same
+                // live challenge/continuation, subject to server expiry.
+                dismissed();
+            };
             open.addEventListener('click', () => {
+                if(isOpen())return;
                 previous=document.activeElement;
-                if (typeof dialog.showModal === 'function') dialog.showModal();
-                else dialog.setAttribute('open', '');
+                presented=true;
+                if(typeof dialog.showModal==='function')dialog.showModal();
+                else dialog.setAttribute('open','');
+                syncPopupDismissal(shell);
             });
-            close.addEventListener('click', () => {
-                if (typeof dialog.close === 'function') dialog.close();
-                else {dialog.removeAttribute('open');previous?.focus();}
+            close.addEventListener('click',dismiss);
+            dialog.addEventListener('cancel',event=>{
+                event.preventDefault();dismiss();
             });
-            dialog.addEventListener('close',()=>previous?.focus());
+            dialog.addEventListener('keydown',event=>{
+                if(event.key==='Escape'&&typeof dialog.showModal!=='function'){
+                    event.preventDefault();dismiss();
+                }
+            });
+            dialog.addEventListener('close',dismissed);
         });
         document.addEventListener('click',event=>{
             const visibility=event.target.closest('[data-ach-password-visibility]');
@@ -1121,11 +1182,11 @@
             const shell=shellFor(form);
             if(!shell||!local(form.action))return;
             event.preventDefault();
-            if(navigations.has(shell))return;
+            if(shellBusy(shell))return;
             const body=new FormData(form);
             if(event.submitter?.name)body.append(event.submitter.name,event.submitter.value);
             // Do not retain passwords in a draft, history, or cached HTML.
-            for(const field of form.querySelectorAll('input[autocomplete="current-password"],input[autocomplete="new-password"]'))field.value='';
+            clearNativeCredentials(form);
             navigateShell(shell,form.action,{body});
         });
         const standalone=document.querySelector('[data-ach-auth-shell]');

@@ -50,7 +50,8 @@
 .ach-accounts-dialog button.ach-accounts-link:hover, .ach-accounts-dialog button.ach-accounts-link:focus {
     background:transparent; border:0; box-shadow:none; color:inherit;
 }
-.ach-accounts button.ach-accounts-link:disabled { opacity:.65; cursor:not-allowed; }
+.ach-accounts button.ach-accounts-link:disabled,
+.ach-accounts-dialog button.ach-accounts-link:disabled { opacity:.65; cursor:not-allowed; }
 .ach-accounts .ach-accounts-native { display:block; margin-block-start:.65rem; overflow-wrap:anywhere; }
 .ach-accounts [data-ach-status]:empty { display:none; }
 .ach-accounts [data-ach-status][data-error="1"] {
