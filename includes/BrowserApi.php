@@ -124,6 +124,7 @@ final class BrowserApi
         $managed = EmailRecovery::managed($id);
         return [
             'authenticated' => $id > 0,
+            'user_id' => $context === 'checkout' ? $id : 0,
             'qualified' => $context === 'checkout' ? CheckoutGate::qualified($mobile) : SessionProof::qualifies(),
             'phone_matches' => $identity === null || $mobile === null || $mobile === '' || CheckoutGate::matchesMobile($mobile),
             'recent_proof' => SessionProof::qualifies(SessionProof::LINK_FRESHNESS),
@@ -145,6 +146,7 @@ final class BrowserApi
             'invalid_proof' => [400, __('The code is invalid or has expired. Please check the code or request a new one.', 'ach-wp-accounts')],
             'identity_changed' => [409, __('Your account or mobile number changed. Please start again.', 'ach-wp-accounts')],
             'identity_conflict' => [409, __('This mobile number cannot be linked to this account. Please use your existing account or contact support.', 'ach-wp-accounts')],
+            'existing_account_required' => [409, __('An existing account uses this email address. Recover that account before creating another account.', 'ach-wp-accounts')],
             'native_login_required' => [403, __('Please sign in using your existing account credentials.', 'ach-wp-accounts')],
             'registration_disabled', 'registration_denied' => [403, __('Account registration is not available here. Please sign in to your existing account or contact support.', 'ach-wp-accounts')],
             'registration_pending' => [409, __('We could not finish creating your account. Please contact support before trying again.', 'ach-wp-accounts')],
@@ -183,7 +185,8 @@ final class BrowserApi
                         ? (Identity::byUser(get_current_user_id())->mobile ?? '') : $entered;
                     $ticket = $flow->start(
                         self::browser(true), $mobile, $purpose, $context,
-                        self::input('password', 4096, false)
+                        self::input('password', 4096, false),
+                        self::input('login', 254, false), self::input('contact_email', 254, false)
                     );
                     $canonical = Mobile::normalize($mobile);
                     $result = ['ticket' => $ticket,
@@ -217,6 +220,7 @@ final class BrowserApi
                         'store_nonce'=>wp_create_nonce('wc_store_api'),
                         'rest_nonce'=>wp_create_nonce('wp_rest'),
                         'nonce_timestamp'=>time(),
+                        'user_id'=>get_current_user_id(),
                     ];
                     break;
                 case 'recovery_email':

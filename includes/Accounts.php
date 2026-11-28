@@ -188,6 +188,28 @@ final class AccountPolicy
         }
     }
 
+    /**
+     * Credential recovery is not a password-only login. It can authorize a
+     * first mobile binding, but a native session is issued only after OTP.
+     */
+    public static function recoveryUser(string $login, #[\SensitiveParameter] string $password): \WP_User
+    {
+        if (get_current_user_id() !== 0 || $login === '' || $password === '') {
+            throw new VerificationError('reauthentication_required');
+        }
+        $network = hash_hmac('sha256', (string)($_SERVER['REMOTE_ADDR'] ?? ''), wp_salt('auth'));
+        self::reserveAccountAction('recover-network-'.$network, 0, 30, 'reauthentication_unavailable');
+        $candidate = get_user_by('login', $login) ?: get_user_by('email', $login);
+        if ($candidate instanceof \WP_User) {
+            self::reserveAccountAction('recover', $candidate->ID, 10, 'reauthentication_unavailable');
+        }
+        $user = NativeAccess::reauthenticate($login, $password);
+        if (!$user instanceof \WP_User || !self::ordinary($user) || Identity::byUser($user->ID)) {
+            throw new VerificationError('reauthentication_required');
+        }
+        return $user;
+    }
+
     /** Bounded native reauthentication of the current authenticated account. */
     public static function reauthenticate(int $userId, #[\SensitiveParameter] string $password): void
     {

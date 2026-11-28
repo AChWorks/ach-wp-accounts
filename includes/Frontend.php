@@ -195,6 +195,10 @@ final class Frontend
             'checkout_refresh_failed' => __('Mobile verified, but checkout could not be refreshed. Select Pay to try again.', 'ach-wp-accounts'),
             'cancel_verification' => __('Cancel verification', 'ach-wp-accounts'),
             'checking' => __('Checking…', 'ach-wp-accounts'),
+            'recover' => __('Recover your existing account', 'ach-wp-accounts'),
+            'recover_description' => __('Confirm your existing account credentials and verify a mobile number to keep your account.', 'ach-wp-accounts'),
+            'return_mobile' => __('Continue with mobile number', 'ach-wp-accounts'),
+            'required' => __('Complete the required field.', 'ach-wp-accounts'),
         ];
         $id = wp_unique_id('ach-accounts-');
         $title = $surface === 'checkout' ? __('Verify your mobile to continue checkout', 'ach-wp-accounts')
@@ -219,6 +223,10 @@ final class Frontend
                     <label for="<?php echo esc_attr($id . '-mobile'); ?>"><?php esc_html_e('Mobile number', 'ach-wp-accounts'); ?></label>
                     <input id="<?php echo esc_attr($id . '-mobile'); ?>" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" data-ach-mobile>
                 </div>
+                <div data-ach-login-field hidden>
+                    <label for="<?php echo esc_attr($id . '-login'); ?>"><?php esc_html_e('Email or username','ach-wp-accounts'); ?></label>
+                    <input id="<?php echo esc_attr($id . '-login'); ?>" type="text" autocomplete="username" data-ach-login disabled>
+                </div>
                 <div data-ach-password-field hidden>
                     <label for="<?php echo esc_attr($id . '-password'); ?>"><?php echo esc_html($strings['password']); ?></label>
                     <input id="<?php echo esc_attr($id . '-password'); ?>" type="password" autocomplete="current-password" data-ach-password disabled>
@@ -234,6 +242,10 @@ final class Frontend
                     <button type="button" class="ach-accounts-link" data-ach-resend hidden><?php echo esc_html($strings['resend']); ?></button>
                 </div>
             <?php if ($checkoutKind !== ''): ?></div><button type="button" class="ach-accounts-link" data-ach-cancel><?php esc_html_e('Cancel verification','ach-wp-accounts'); ?></button><?php else: ?></form><?php endif; ?>
+            <?php if ($surface !== 'profile'): ?>
+                <button type="button" class="ach-accounts-link" data-ach-recover hidden><?php echo esc_html($strings['recover']); ?></button>
+                <a class="ach-accounts-native" data-ach-reset hidden href="<?php echo esc_url($context !== 'wp' && AuthPage::commerceAvailable() ? wc_lostpassword_url() : wp_lostpassword_url()); ?>"<?php if ($surface === 'checkout'): ?> target="_blank" rel="noopener noreferrer"<?php endif; ?>><?php esc_html_e('Forgot password?', 'ach-wp-accounts'); ?></a>
+            <?php endif; ?>
             <button type="button" class="ach-accounts-link" data-ach-change hidden><?php echo esc_html($strings['change_mobile']); ?></button>
             <button type="button" class="ach-accounts-link" data-ach-password-change hidden><?php echo esc_html($strings['password_change']); ?></button>
             <button type="button" class="ach-accounts-link" data-ach-retry hidden><?php echo esc_html($strings['retry_status']); ?></button>

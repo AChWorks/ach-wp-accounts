@@ -7,12 +7,20 @@ defined('ABSPATH') || exit;
 final class NativeAccess
 {
     private static bool $reauthenticating = false;
+    private static int $applicationUser = 0;
 
     public static function hooks(): void
     {
+        add_filter('authenticate', static function ($result) {
+            self::$applicationUser = 0;
+            return $result;
+        }, PHP_INT_MIN);
+        add_action('application_password_did_authenticate', static function (\WP_User $user): void {
+            self::$applicationUser = $user->ID;
+        });
         add_filter('authenticate', [self::class, 'password'], PHP_INT_MAX, 3);
         add_filter('registration_errors', [self::class, 'registration'], PHP_INT_MAX, 3);
-        add_filter('woocommerce_registration_errors', [self::class, 'registration'], PHP_INT_MAX, 3);
+        add_filter('woocommerce_registration_errors', [self::class, 'customerRegistration'], PHP_INT_MAX, 3);
         add_filter('woocommerce_process_registration_errors', [self::class, 'commerceRegistration'], PHP_INT_MAX, 4);
     }
 
@@ -29,7 +37,12 @@ final class NativeAccess
     /** Do not alter application-password, XML-RPC, CLI or existing-session authority. */
     public static function password(mixed $result, mixed $login, #[\SensitiveParameter] mixed $password): mixed
     {
-        if (self::$reauthenticating || self::passwordAllowed() || !is_string($password) || $password === '' ||
+        $machine = $result instanceof \WP_User && self::$applicationUser === $result->ID;
+        self::$applicationUser = 0;
+        if (self::$reauthenticating && $machine) {
+            return new \WP_Error('reauthentication_required');
+        }
+        if ($machine || self::$reauthenticating || self::passwordAllowed() || !is_string($password) || $password === '' ||
             !$result instanceof \WP_User || !AccountPolicy::ordinary($result) ||
             (defined('XMLRPC_REQUEST') && XMLRPC_REQUEST) ||
             (defined('WP_CLI') && WP_CLI)) {
@@ -45,6 +58,7 @@ final class NativeAccess
         $previous = self::$reauthenticating;
         self::$reauthenticating = true;
         try {
+            do_action_ref_array('wp_authenticate', [&$login, &$password]);
             return wp_authenticate($login, $password);
         } finally {
             self::$reauthenticating = $previous;
@@ -61,6 +75,17 @@ final class NativeAccess
                 __('Registration with email is disabled. Register with your mobile number.', 'ach-wp-accounts'));
         }
         return $errors;
+    }
+
+    public static function customerRegistration(mixed $errors, string $login, string $email): mixed
+    {
+        // Native authorized provisioning is not public account signup. Never
+        // infer privilege from is_admin(), which also covers anonymous AJAX.
+        if (current_user_can('create_users') ||
+            (defined('REST_REQUEST') && REST_REQUEST && current_user_can('manage_woocommerce'))) {
+            return $errors;
+        }
+        return self::registration($errors,$login,$email);
     }
 
     public static function commerceRegistration(mixed $errors, string $login, #[\SensitiveParameter] string $password, string $email): mixed

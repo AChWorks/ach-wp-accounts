@@ -155,6 +155,8 @@ final class AuthPage
         $name = (string)get_bloginfo('name');
         $logo = (int)get_theme_mod('custom_logo');
         $privacy = get_privacy_policy_url();
+        $back = Frontend::localUrl($return,home_url('/'));
+        if (untrailingslashit($back) === untrailingslashit(self::base($context))) { $back = home_url('/'); }
         $terms = $context === 'account' && wc_get_page_id('terms') > 0 ? wc_get_page_permalink('terms') : '';
         ?>
         <!doctype html>
@@ -170,7 +172,7 @@ final class AuthPage
         <main class="ach-auth-page">
           <div class="ach-auth-shell">
             <div class="ach-auth-brand">
-              <a class="ach-auth-back" href="<?php echo esc_url(Frontend::localUrl($return,home_url('/'))); ?>" aria-label="<?php esc_attr_e('Back to site','ach-wp-accounts'); ?>"><span aria-hidden="true">←</span></a>
+              <a class="ach-auth-back" href="<?php echo esc_url($back); ?>" aria-label="<?php esc_attr_e('Back to site','ach-wp-accounts'); ?>"><span aria-hidden="true">←</span></a>
               <a class="ach-auth-logo" href="<?php echo esc_url(home_url('/')); ?>">
                 <?php echo $logo ? wp_get_attachment_image($logo,'medium',false,['class'=>'ach-auth-image','alt'=>$name]) : esc_html($name); ?>
               </a>

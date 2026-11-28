@@ -54,7 +54,7 @@ final class CheckoutUi
         // the original block markup, including any gateway extensions.
         if (wp_script_is('wc-blocks-checkout-events','registered')) {
             wp_enqueue_script('wc-blocks-checkout-events');
-            wp_enqueue_script('wc-blocks-data-store');
+            wp_enqueue_script('wc-blocks-data');
         }
         return $content . self::html('blocks');
     }

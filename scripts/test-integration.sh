@@ -112,6 +112,20 @@ if [[ "${COMPATIBILITY_ONLY:-0}" == 1 ]]; then
     fi
     exit 0
 fi
+if [[ "${ACH_BROWSER_ONLY:-0}" == 1 ]]; then
+    bash "$repo/scripts/test-browser-fixture.sh"
+    exit 0
+fi
+# During development, run selected test programs in the same disposable
+# fixture. The default CI path always executes the complete suite.
+if [[ -n "${ACH_TEST_CASES:-}" ]]; then
+    read -r -a cases <<< "$ACH_TEST_CASES"
+    for name in "${cases[@]}"; do
+        [[ "$name" =~ ^[a-z][a-z0-9-]*$ && -f "$repo/tests/$name.php" ]]
+        "$php_bin" "$repo/tests/$name.php"
+    done
+    exit 0
+fi
 if [[ -n "${OBJECT_CACHE_ARCHIVE:-}" ]]; then
     # Verify the actual external backend and cross-process persistence; never
     # report an object-cache pass if WordPress silently used its runtime cache.
@@ -125,9 +139,11 @@ fi
 "$php_bin" "$repo/tests/standalone.php"
 "$php_bin" "$repo/tests/woocommerce.php"
 "$php_bin" "$repo/tests/accounts.php"
+"$php_bin" "$repo/tests/native-machine.php"
 "$php_bin" "$repo/tests/checkout.php"
 "$php_bin" "$repo/tests/purchase.php"
 "$php_bin" "$repo/tests/frontend.php"
+"$php_bin" "$repo/tests/directory.php"
 "$php_bin" "$repo/tests/operations.php"
 "$php_bin" "$repo/tests/admin.php"
 "$php_bin" "$repo/tests/lifecycle.php"

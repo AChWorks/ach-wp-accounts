@@ -831,3 +831,126 @@ msgstr "رمز عبور شما ذخیره شد."
 
 msgid "Your verification code: {code}"
 msgstr "کد تأیید شما: {code}"
+
+msgid "%s — Sign in"
+msgstr "%s — ورود"
+
+msgid "Allow eligible accounts to sign in with an SMS code."
+msgstr "اجازه ورود به حساب‌های مجاز با کد پیامکی."
+
+msgid "Allow native public email registration where the site permits it."
+msgstr "ثبت‌نام عمومی با ایمیل در صورت مجاز بودن در تنظیمات سایت."
+
+msgid "An existing account uses this email address. Recover that account before creating another account."
+msgstr "حسابی با این ایمیل وجود دارد. برای جلوگیری از ساخت حساب تکراری، ابتدا حساب فعلی خود را بازیابی کنید."
+
+msgid "Back to site"
+msgstr "بازگشت به سایت"
+
+msgid "Cancel verification"
+msgstr "لغو تأیید شماره"
+
+msgid "Check your email to complete registration."
+msgstr "برای تکمیل ثبت‌نام ایمیل خود را بررسی کنید."
+
+msgid "Checking…"
+msgstr "در حال بررسی…"
+
+msgid "Complete the required field."
+msgstr "فیلد ضروری را تکمیل کنید."
+
+msgid "Confirm your existing account credentials and verify a mobile number to keep your account."
+msgstr "اطلاعات ورود به حساب فعلی خود را تأیید کنید و شماره موبایل را احراز کنید تا همان حساب حفظ شود."
+
+msgid "Continue with mobile number"
+msgstr "ادامه با شماره موبایل"
+
+msgid "Customer password sign-in"
+msgstr "ورود مشتری با رمز عبور"
+
+msgid "Email address"
+msgstr "آدرس ایمیل"
+
+msgid "Email or username"
+msgstr "ایمیل یا نام کاربری"
+
+msgid "Email registration"
+msgstr "ثبت‌نام با ایمیل"
+
+msgid "Enable mobile sign-in or keep password sign-in available to customers."
+msgstr "ورود با موبایل را فعال کنید یا امکان ورود مشتریان با رمز عبور را حفظ کنید."
+
+msgid "Enter a valid mobile number before payment."
+msgstr "پیش از پرداخت شماره موبایل معتبری وارد کنید."
+
+msgid "Forgot password?"
+msgstr "رمز عبور را فراموش کرده‌اید؟"
+
+msgid "Keep password sign-in available to ordinary customers. Administrators and other privileged accounts retain native access. Check access for customers without a mobile number before disabling."
+msgstr "ورود مشتریان عادی با رمز عبور را فعال نگه دارید. دسترسی بومی مدیران و حساب‌های دارای دسترسی ویژه حفظ می‌شود. پیش از غیرفعال‌سازی، دسترسی مشتریان بدون شماره موبایل را بررسی کنید."
+
+msgid "Mobile verification"
+msgstr "احراز شماره موبایل"
+
+msgid "Mobile verified, but checkout could not be refreshed. Select Pay to try again."
+msgstr "شماره موبایل تأیید شد اما به‌روزرسانی سفارش انجام نشد. برای تلاش مجدد دکمه پرداخت را بزنید."
+
+msgid "Mobile verified. Review your order and select Pay to continue."
+msgstr "شماره موبایل تأیید شد. سفارش را بررسی کنید و برای ادامه دکمه پرداخت را بزنید."
+
+msgid "No mobile number"
+msgstr "بدون شماره موبایل"
+
+msgid "Password"
+msgstr "رمز عبور"
+
+msgid "Password sign-in is unavailable for this account. Use your verified mobile number or contact support."
+msgstr "ورود با رمز عبور برای این حساب امکان‌پذیر نیست. از شماره موبایل تأییدشده استفاده کنید یا با پشتیبانی تماس بگیرید."
+
+msgid "Pending mobile verification"
+msgstr "در انتظار احراز شماره موبایل"
+
+msgid "Please start again."
+msgstr "لطفاً دوباره شروع کنید."
+
+msgid "Privacy policy"
+msgstr "حریم خصوصی"
+
+msgid "Recover your existing account"
+msgstr "بازیابی حساب فعلی"
+
+msgid "Register"
+msgstr "ثبت‌نام"
+
+msgid "Register with email"
+msgstr "ثبت‌نام با ایمیل"
+
+msgid "Registration with email is disabled. Register with your mobile number."
+msgstr "ثبت‌نام با ایمیل غیرفعال است. با شماره موبایل ثبت‌نام کنید."
+
+msgid "Sign in with mobile"
+msgstr "ورود با موبایل"
+
+msgid "Terms and conditions"
+msgstr "قوانین و شرایط"
+
+msgid "The selected account methods also respect native WordPress and WooCommerce registration settings."
+msgstr "روش‌های انتخاب‌شده تابع تنظیمات ثبت‌نام WordPress و WooCommerce نیز هستند."
+
+msgid "Unavailable"
+msgstr "در دسترس نیست"
+
+msgid "Use the mobile number linked to your account, or manage your account mobile number first."
+msgstr "از شماره موبایل متصل به حساب خود استفاده کنید یا ابتدا شماره موبایل حساب را مدیریت کنید."
+
+msgid "Username"
+msgstr "نام کاربری"
+
+msgid "Verified — %s"
+msgstr "احراز شده — %s"
+
+msgid "Verify and continue to payment"
+msgstr "تأیید و ادامه پرداخت"
+
+msgid "Your checkout has changed. Review your order and select Pay again."
+msgstr "اطلاعات سفارش تغییر کرده است. سفارش را بررسی کنید و دوباره دکمه پرداخت را بزنید."

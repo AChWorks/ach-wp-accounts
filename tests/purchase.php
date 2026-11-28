@@ -75,7 +75,7 @@ if ($mode!=='parent') {
     wc_clear_notices();
     $billing=['first_name'=>'Fixture','last_name'=>'Customer','company'=>'',
         'address_1'=>'100 Fixture Avenue','address_2'=>'','city'=>'Los Angeles','state'=>'CA',
-        'postcode'=>'90001','country'=>'US','phone'=>'2025550100','email'=>'fixture-order-billing@example.invalid'];
+        'postcode'=>'90001','country'=>'US','phone'=>$mode==='store-link' ? '09124440004' : \ACh\WPAccounts\Mobile::local(Identity::byUser($userId)->mobile),'email'=>'fixture-order-billing@example.invalid'];
     register_shutdown_function(static function () use ($mode,$qualified,$userId):void {
         file_put_contents(getenv('ACH_TEST_DIR').'/purchase-state.json',wp_json_encode([
             'mode'=>$mode,'qualified'=>$qualified,'cart_count'=>WC()->cart ? WC()->cart->get_cart_contents_count() : -1,

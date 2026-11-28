@@ -32,8 +32,10 @@ jobs:
       - name: Validate PHP and shell syntax
         run: |
           git ls-files -z '*.php' | xargs -0 -n 1 php -l
-          bash -n scripts/test-integration.sh
+          bash -n scripts/test-integration.sh scripts/test-browser-fixture.sh
           node --check assets/accounts.js
+          node --check assets/customer-directory.js
+          node --check tests/browser-checkout.cjs
           node --check assets/admin.js
       - name: Run isolated WordPress and WooCommerce tests
         run: scripts/test-integration.sh

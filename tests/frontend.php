@@ -1,5 +1,7 @@
 <?php
 use ACh\WPAccounts\Frontend;
+use ACh\WPAccounts\AuthPage;
+use ACh\WPAccounts\CheckoutUi;
 use ACh\WPAccounts\Identity;
 use ACh\WPAccounts\SessionProof;
 
@@ -38,34 +40,40 @@ $product->set_virtual(true);
 $product->set_status('publish');
 $productId=$product->save();
 frontCheck((bool)WC()->cart->add_to_cart($productId),'Could not populate checkout cart');
-$gate=Frontend::checkoutShortcode(false,'woocommerce_checkout',[],[]);
-frontCheck(is_string($gate) && str_contains($gate,'data-surface="checkout"') &&
-    str_contains($gate,'data-ach-native-link') && !str_contains($gate,'id="payment"'),'Classic checkout did not render gate shell');
-foreach ([
-    ['blockName'=>'woocommerce/checkout'],
-    ['blockName'=>'woocommerce/classic-shortcode','attrs'=>['shortcode'=>'checkout']],
-] as $block) {
-    $html=Frontend::checkoutBlock(null,$block);
-    frontCheck(is_string($html) && str_contains($html,'data-surface="checkout"'),'Block checkout gate missing');
-}
-frontCheck(Frontend::checkoutBlock(null,['blockName'=>'woocommerce/cart'])===null,'Cart block replaced');
-frontCheck(Frontend::checkoutShortcode(false,'woocommerce_my_account',[],[])===false,'Account shortcode replaced');
+CheckoutUi::prepare();
+frontCheck(!WC()->checkout()->is_registration_required(),'Guest checkout hidden by native registration policy');
+$native='<div id="payment">Native payment</div>';
+$html=CheckoutUi::blocks($native);
+frontCheck(str_starts_with($html,$native) && str_contains($html,'data-checkout-kind="blocks"') &&
+    str_contains($html,'data-ach-accounts hidden')===false,'Block checkout native markup lost');
+ob_start();
+CheckoutUi::classic();
+$gate=ob_get_clean();
+frontCheck(str_contains($gate,'data-checkout-kind="classic" hidden') &&
+    str_contains($gate,'data-ach-form') && !str_contains($gate,'<form '),'Classic inline OTP is missing or nested form');
 
-global $wp, $action, $interim_login;
+global $wp, $action;
 $wp->query_vars['order-received']=123;
-frontCheck(Frontend::checkoutShortcode(false,'woocommerce_checkout',[],[])===false,'Order receipt replaced');
+frontCheck(CheckoutUi::blocks($native)===$native,'Order receipt replaced');
 unset($wp->query_vars['order-received']);
-$action='lostpassword';
-frontCheck(Frontend::loginMessage('native')==='native','Password recovery replaced');
-$action='login';
-$interim_login=false;
 $_REQUEST=['reauth'=>'1'];
-frontCheck(Frontend::loginMessage('native')==='native','Native reauthentication replaced');
+frontCheck(!AuthPage::ordinaryCoreRequest(),'Native reauthentication replaced');
+$_REQUEST=['redirect_to'=>admin_url()];
+frontCheck(!AuthPage::ordinaryCoreRequest(),'Native administrator login replaced');
 $_REQUEST=[];
-$_GET=['ach_accounts_native'=>'1'];
-frontCheck(Frontend::loginMessage('native')==='native','Native email/password fallback replaced');
 $_GET=[];
-frontCheck(str_contains(Frontend::loginMessage('native'),'data-native-target="core"'),'Ordinary native login missing shared form');
+frontCheck(AuthPage::ordinaryCoreRequest(),'Ordinary native login not handled');
+ob_start();
+AuthPage::document('wp',home_url('/'),'mobile');
+$document=ob_get_clean();
+frontCheck(str_contains($document,'<!doctype html>') && str_contains($document,'ach-auth-shell') &&
+    str_contains($document,'data-ach-accounts') && !str_contains($document,'name="log"'),'Standalone document did not own ordinary login');
+fixtureFlag('allow_password_login',false);
+fixtureFlag('allow_email_registration',false);
+frontCheck(AuthPage::method('account','password')==='mobile' && AuthPage::method('account','email')==='mobile' &&
+    AuthPage::secondaryUrl(home_url('/'))==='','Disabled methods remain visible');
+fixtureFlag('allow_password_login',true);
+fixtureFlag('allow_email_registration',true);
 frontCheck(str_contains(Frontend::shortcode(['display'=>'popup']),'<dialog'),'Popup does not reuse shared form');
 frontCheck(Frontend::localUrl('https://elsewhere.test/path','fallback')==='fallback' &&
     Frontend::localUrl('//elsewhere.test/path','fallback')==='fallback' &&
@@ -77,14 +85,13 @@ $identity=Identity::bind($user,'+989121111123','absent');
 add_action('set_logged_in_cookie',static function($cookie):void { $_COOKIE[LOGGED_IN_COOKIE]=$cookie; });
 wp_set_current_user($user);
 wp_set_auth_cookie($user,false,true);
-frontCheck(is_string(Frontend::checkoutShortcode(false,'woocommerce_checkout',[],[])),'Native email user bypassed visual checkout gate');
+frontCheck(str_contains(CheckoutUi::blocks($native),'data-checkout-kind="blocks"'),'Native email customer lost checkout adapter');
 SessionProof::record($user,SessionProof::currentToken($user),$identity);
-frontCheck(Frontend::checkoutShortcode(false,'woocommerce_checkout',[],[])===false &&
-    Frontend::checkoutBlock(null,['blockName'=>'woocommerce/checkout'])===null,'Qualified session did not restore native checkout renderer');
+frontCheck(str_contains(CheckoutUi::blocks($native),'data-checkout-kind="blocks"'),'Qualified session lost native inline controller');
 fixtureFlag('checkout_required',false);
 wp_set_current_user(0);
 unset($_COOKIE[LOGGED_IN_COOKIE]);
-frontCheck(Frontend::checkoutShortcode(false,'woocommerce_checkout',[],[])===false,'Disabled policy changed checkout renderer');
+frontCheck(CheckoutUi::blocks($native)===$native,'Disabled policy changed checkout renderer');
 fixtureFlag('auth_enabled',false);
 frontCheck(Frontend::shortcode([])==='','Disabled plugin still renders shortcode form');
 fixtureFlag('auth_enabled',true);
@@ -99,4 +106,4 @@ frontCheck(__('Sign in','ach-wp-accounts')==='ورود','Persian translation not
 $html=Frontend::render('wp','login','https://accounts.test/','https://accounts.test/wp-login.php');
 frontCheck(str_contains($html,'شماره موبایل') && str_contains($html,'autocomplete="one-time-code"') &&
     str_contains($html,'dir="ltr"'),'Localized mobile/OTP form contract failed');
-echo "PASS: classic and block presentation gate, native email fallback/actions, qualified and disabled renderers, safe redirects, popup and Persian catalog\n";
+echo "PASS: native checkout markup retained, inline verification shell, standalone authentication document, native privileged paths, disabled methods, safe redirects, popup and Persian catalog\n";

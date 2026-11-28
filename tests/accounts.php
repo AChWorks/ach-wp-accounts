@@ -380,6 +380,55 @@ $before=(int)$wpdb->get_var("SELECT COUNT(*) FROM $wpdb->users");
 expectAccountError(fn()=> Accounts::register($pendingMobile,'account'),'identity_conflict');
 ensureAccount((int)$wpdb->get_var("SELECT COUNT(*) FROM $wpdb->users")===$before,'Uncertain registration repeated user creation');
 
+// Recovery must prove native credentials and OTP without a password-only
+// session, duplicate account, or replacement of another identity.
+guest();
+clearLimits();
+$recoveryPassword=wp_generate_password(32);
+$recoverId=wp_insert_user(['user_login'=>'fixture_recover_native','user_email'=>'fixture_recover_native@example.invalid',
+    'user_pass'=>$recoveryPassword,'role'=>'customer']);
+ensureAccount(is_int($recoverId),'Recovery fixture creation failed');
+fixtureFlag('allow_password_login',false);
+fixtureFlag('allow_email_registration',false);
+$denied=wp_signon(['user_login'=>'fixture_recover_native','user_password'=>$recoveryPassword],true);
+ensureAccount(is_wp_error($denied) && $denied->get_error_code()==='ach_accounts_password_disabled','Disabled native password policy bypassed');
+$denied=register_new_user('fixture_forbidden_signup','fixture_forbidden_signup@example.invalid');
+ensureAccount(is_wp_error($denied) && in_array('ach_accounts_email_registration_disabled',$denied->get_error_codes(),true),'Core email registration bypassed');
+$denied=wc_create_new_customer('fixture_forbidden_woo@example.invalid','fixture_forbidden_woo',wp_generate_password(32));
+ensureAccount(is_wp_error($denied) && in_array('ach_accounts_email_registration_disabled',$denied->get_error_codes(),true),'Woo email registration bypassed');
+$admin=get_user_by('login','fixture_admin');
+wp_set_current_user($admin->ID);
+ensureAccount(is_int(wc_create_new_customer('fixture_provisioned@example.invalid','fixture_provisioned',wp_generate_password(32))),'Privileged native provisioning blocked');
+guest();
+$recoverBrowser=browserSecret();
+$recoverMobile='+989121111131';
+expectAccountError(fn()=> $flow->start($recoverBrowser,$recoverMobile,'recover','account','wrong','fixture_recover_native'),'reauthentication_required');
+$before=(int)$wpdb->get_var("SELECT COUNT(*) FROM $wpdb->users");
+$attempt=$flow->start($recoverBrowser,$recoverMobile,'login','checkout','','','fixture_recover_native@example.invalid');
+$sent=sendFlow($flow,$recoverBrowser,$attempt);
+expectAccountError(fn()=> $flow->complete($recoverBrowser,$attempt,$sent->code),'existing_account_required');
+ensureAccount(!Identity::byMobile($recoverMobile) && get_current_user_id()===0,'Existing contact was used as account authority');
+clearLimits();
+$recoveryTicket=$flow->start($recoverBrowser,$recoverMobile,'recover','checkout',$recoveryPassword,'fixture_recover_native');
+ensureAccount(get_current_user_id()===0 && !Identity::byUser($recoverId),'Native credential proof issued a session or identity prematurely');
+$sent=sendFlow($flow,$recoverBrowser,$recoveryTicket);
+$result=$flow->complete($recoverBrowser,$recoveryTicket,$sent->code);
+ensureAccount($result['created']===false && get_current_user_id()===$recoverId && SessionProof::qualifies() &&
+    (int)$wpdb->get_var("SELECT COUNT(*) FROM $wpdb->users")===$before,'Credential + OTP recovery created a second account or unqualified session');
+expectAccountError(fn()=> $flow->start(browserSecret(),'+989121111132','link','checkout',$recoveryPassword),'invalid_context');
+ensureAccount(Identity::byUser($recoverId)->mobile===$recoverMobile,'Checkout replaced established identity');
+guest();
+expectAccountError(fn()=> $flow->start(browserSecret(),'+989121111132','recover','account',$recoveryPassword,'fixture_recover_native'),'reauthentication_required');
+fixtureFlag('allow_email_registration',true);
+$allowed=register_new_user('fixture_allowed_signup','fixture_allowed_signup@example.invalid');
+ensureAccount(is_int($allowed),'Independent email registration was blocked by password flag');
+fixtureFlag('allow_password_login',true);
+fixtureFlag('allow_email_registration',false);
+$allowed=wp_signon(['user_login'=>'fixture_recover_native','user_password'=>$recoveryPassword],true);
+ensureAccount($allowed instanceof WP_User && $allowed->ID===$recoverId,'Independent native password login was blocked by email flag');
+guest();
+fixtureFlag('allow_email_registration',true);
+unset($recoveryPassword);
 nativeSession($legacyId);
 $cookie=$_COOKIE[LOGGED_IN_COOKIE];
 wp_logout();
@@ -389,4 +438,5 @@ ensureAccount(!SessionProof::qualifies(),'Logout did not revoke native session')
 guest();
 wp_delete_user($legacyId);
 ensureAccount(Identity::byUser($legacyId)===null,'Native deletion retained identity');
+echo "PASS: independent native access policies, privileged provisioning, existing account credential + OTP recovery and checkout identity immutability\n";
 echo "PASS: browser-bound native customer login/registration, role and auth hooks, session step-up, identity changes, email recovery, concurrent registration and uncertain recovery\n";
